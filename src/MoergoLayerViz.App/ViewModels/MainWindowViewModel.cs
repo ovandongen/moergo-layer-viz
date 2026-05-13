@@ -12,6 +12,8 @@ using MoergoLayerViz.Core.Keymap;
 using MoergoLayerViz.Core.Layout;
 using MoergoLayerViz.Core.Models;
 using MoergoLayerViz.Core.Settings;
+using ZmkHidProtocol.ActiveWindow;
+using ZmkHidProtocol.Building;
 using ZmkHidProtocol.Transport;
 
 namespace MoergoLayerViz.App.ViewModels;
@@ -21,8 +23,15 @@ namespace MoergoLayerViz.App.ViewModels;
 /// active layer, the live-key tracker, and persists the user's choice of
 /// keyboard + last-loaded JSON path.
 /// </summary>
-public partial class MainWindowViewModel : ObservableObject
+public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 {
+    /// <summary>
+    /// Always null on the main VM — the main window's BoardView is read-only.
+    /// The picker VM (<see cref="ExitKeyPickerViewModel"/>) provides a real
+    /// handler so taps register selections.
+    /// </summary>
+    public Action<int>? OnKeyTapped => null;
+
     private readonly ISettingsService _settingsService;
 
     private IKeyboardProfile _profile;
@@ -50,6 +59,8 @@ public partial class MainWindowViewModel : ObservableObject
     private IKeyEventSource? _keyEventSource;
     private HotkeyLayerTracker? _tracker;
     private LayerSourceCoordinator? _layerCoordinator;
+    private CommandSender? _commandSender;
+    private LayerStateTracker? _layerStateTracker;
     private string _layerSourceMode = LayerSourceCoordinator.ModeAuto;
 
     // Active-layer (modifier-set + keycode) → KeyViewModel(s) lookup, rebuilt
@@ -488,17 +499,447 @@ public partial class MainWindowViewModel : ObservableObject
     public IRelayCommand OpenGenerateSignalsCommand { get; }
 
     private readonly SharpHookProvider? _hookProvider;
+    private readonly IActiveWindowMonitor? _activeWindowMonitor;
 
-    public MainWindowViewModel(ISettingsService settingsService, SharpHookProvider? hookProvider = null)
+    /// <summary>
+    /// Layer index most recently pushed by the auto-switch engine. Used to
+    /// detect user manual override: if <see cref="ActiveLayerIndex"/> differs
+    /// from this on a focus-out from a rule-controlled session, the user
+    /// picked their own layer mid-session and the fallback push is skipped.
+    /// Reset to null on no-match transition and on master-toggle flips.
+    /// </summary>
+    private int? _lastAutoSwitchLayer;
+
+    /// <summary>
+    /// Reference to the last <see cref="AppLayerRule"/> the engine fired for.
+    /// Used for dedupe — re-evaluations that resolve to the same rule (e.g.
+    /// window-title-only changes within the same matched process) are
+    /// suppressed via value-equality. Different rule reference (different
+    /// process, or edited rule) re-fires even to the same layer index.
+    /// </summary>
+    private AppLayerRule? _lastFiredRule;
+
+    /// <summary>
+    /// Snapshot of <see cref="ActiveLayerIndex"/> taken at the moment focus
+    /// first moved from a no-rule app to a rule-matched app. Stays put across
+    /// rule → rule transitions within the same session (Excel → Word doesn't
+    /// re-snapshot). Cleared when focus returns to a no-rule app — at which
+    /// point, if the user hasn't manually overridden the engine-pushed layer,
+    /// this value is restored. Null = not currently in a rule-controlled
+    /// session.
+    /// </summary>
+    private int? _preRuleLayer;
+
+    public const string AutoSwitchFallbackPrevious = "Previous";
+    public const string AutoSwitchFallbackBase = "Base";
+
+    /// <summary>
+    /// True once the user double-tapped the exit-tap key while a rule-driven
+    /// layer was active and we pushed the fallback. The next double-tap, if
+    /// the same rule still matches, re-pushes the rule's layer and clears
+    /// this flag. Cleared on any focus change (rule→rule normal fire,
+    /// rule→no-rule end-of-session). The pre-rule snapshot is retained
+    /// across this toggle.
+    /// </summary>
+    private bool _userExited;
+
+    /// <summary>
+    /// Watches firmware key-position events (via <see cref="ILayerSource.KeyPositionEvent"/>)
+    /// for the single key the user configured per keyboard, and fires
+    /// <see cref="OnExitTapTriggered"/> on double-tap. Lives for the whole
+    /// VM lifetime; position is swapped in via
+    /// <see cref="MultiTapDetector.SetPosition"/> on configure / profile
+    /// switch. Null position = detector is dormant (no-op in OnKeyEvent).
+    /// </summary>
+    private readonly MultiTapDetector _exitTapDetector = new();
+
+    private int? _exitTapKey;
+
+    /// <summary>
+    /// Configured firmware key index for the active keyboard's exit-tap key,
+    /// or null when none is configured. Persisted per-profile in
+    /// <see cref="UserSettings.AutoSwitchExitKey"/>. Read-only externally;
+    /// mutate via <see cref="SetExitTapKey"/> so persistence + detector stay
+    /// in sync.
+    /// </summary>
+    public int? ExitTapKey => _exitTapKey;
+
+    /// <summary>Replaces the exit-tap key for the active profile, persists,
+    /// and re-arms the detector. Null clears the key (detector goes dormant
+    /// for this profile).</summary>
+    public void SetExitTapKey(int? index)
+    {
+        var clean = index is int i && i >= 0 ? i : (int?)null;
+
+        _exitTapKey = clean;
+        _exitTapDetector.SetPosition(clean);
+        OnPropertyChanged(nameof(ExitTapKey));
+
+        var profileId = _profile.Id;
+        PersistSetting(s =>
+        {
+            var clone = new Dictionary<string, int>(s.AutoSwitchExitKey);
+            if (clean is null) clone.Remove(profileId);
+            else clone[profileId] = clean.Value;
+            return s with { AutoSwitchExitKey = clone };
+        });
+    }
+
+    /// <summary>Reloads the exit-tap key for the active profile from
+    /// settings and arms the detector. Called on construction and after a
+    /// profile switch.</summary>
+    private void ReloadExitTapKey()
+    {
+        var s = _settingsService.Load();
+        int? key = s.AutoSwitchExitKey.TryGetValue(_profile.Id, out var stored) && stored >= 0
+            ? stored
+            : (int?)null;
+        _exitTapKey = key;
+        _exitTapDetector.SetPosition(key);
+        OnPropertyChanged(nameof(ExitTapKey));
+    }
+
+    /// <summary>
+    /// Latest focused-app snapshot, or null before the monitor's first poll
+    /// (or when the monitor is unavailable). Phase 1 surface only — bound to
+    /// the Testing tab labels via <see cref="SettingsViewModel"/>.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(MatchedAppLayerRule))]
+    private ActiveWindowInfo? _activeWindow;
+
+    /// <summary>
+    /// Per-keyboard app→layer rules for the active profile. Mutates only via
+    /// <see cref="AddAppLayerRule"/> / <see cref="RemoveAppLayerRule"/> /
+    /// <see cref="ReloadAppLayerRules"/> so the persisted list stays in sync.
+    /// </summary>
+    public ObservableCollection<AppLayerRule> AppLayerRules { get; } = new();
+
+    /// <summary>
+    /// Master toggle for the auto-switch engine. When true (and the active
+    /// keyboard has at least one rule), <see cref="MatchedAppLayerRule"/>
+    /// changes push the matched layer to the keyboard, and the
+    /// <c>IActiveWindowMonitor</c> runs. When false, the monitor stops and
+    /// the engine no-ops regardless of focus changes.
+    /// </summary>
+    [ObservableProperty]
+    private bool _isAutoSwitchKeyboardLayerEnabled;
+
+    partial void OnIsAutoSwitchKeyboardLayerEnabledChanged(bool value)
+    {
+        PersistSetting(s => s with { AutoSwitchKeyboardLayer = value });
+        // Clear engine state so re-enabling immediately re-fires the current
+        // match, and so disabling doesn't leave stale state that suppresses
+        // a future re-enable or strands a snapshot from a previous session.
+        _lastAutoSwitchLayer = null;
+        _lastFiredRule = null;
+        _preRuleLayer = null;
+        _userExited = false;
+        UpdateActiveWindowMonitorGating();
+        if (value) TryFireAutoSwitch();
+    }
+
+    /// <summary>
+    /// Fallback target for the active keyboard when focus moves away from
+    /// any matched app. <see cref="AutoSwitchFallbackPrevious"/> (default) or
+    /// <see cref="AutoSwitchFallbackBase"/>. Persisted per-keyboard in
+    /// <see cref="UserSettings.AutoSwitchFallback"/>; reloaded on profile
+    /// switch via <see cref="ReloadAutoSwitchFallback"/>.
+    /// </summary>
+    [ObservableProperty]
+    private string _autoSwitchFallbackMode = AutoSwitchFallbackPrevious;
+
+    partial void OnAutoSwitchFallbackModeChanged(string value)
+    {
+        var profileId = _profile.Id;
+        PersistSetting(s =>
+        {
+            var clone = new Dictionary<string, string>(s.AutoSwitchFallback);
+            clone[profileId] = value;
+            return s with { AutoSwitchFallback = clone };
+        });
+    }
+
+    /// <summary>Reloads the per-keyboard fallback mode from settings. Called
+    /// on construction and after a profile switch. Goes through the setter
+    /// so the SettingsViewModel pass-through re-raises;
+    /// <see cref="OnAutoSwitchFallbackModeChanged"/> will re-persist the
+    /// loaded value under the current profile (idempotent, single atomic
+    /// write — negligible cost).</summary>
+    private void ReloadAutoSwitchFallback()
+    {
+        var s = _settingsService.Load();
+        var mode = s.AutoSwitchFallback.TryGetValue(_profile.Id, out var m) && !string.IsNullOrWhiteSpace(m)
+            ? m
+            : AutoSwitchFallbackPrevious;
+        AutoSwitchFallbackMode = mode;
+    }
+
+    /// <summary>
+    /// First rule (list order) whose <c>ProcessMatch</c> is a case-insensitive
+    /// substring of <c>ActiveWindow.ProcessName</c>, or null if none match.
+    /// Phase 2 readout only — Phase 3 will drive layer pushes off this.
+    /// </summary>
+    public AppLayerRule? MatchedAppLayerRule
+    {
+        get
+        {
+            var name = ActiveWindow?.ProcessName;
+            if (string.IsNullOrWhiteSpace(name)) return null;
+            foreach (var r in AppLayerRules)
+            {
+                if (string.IsNullOrWhiteSpace(r.ProcessMatch)) continue;
+                if (name.Contains(r.ProcessMatch, StringComparison.OrdinalIgnoreCase))
+                    return r;
+            }
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Reloads <see cref="AppLayerRules"/> from settings for the active
+    /// profile. Called on construction and after a profile switch.
+    /// </summary>
+    private void ReloadAppLayerRules()
+    {
+        AppLayerRules.Clear();
+        var s = _settingsService.Load();
+        if (s.AppLayerRules.TryGetValue(_profile.Id, out var list))
+        {
+            foreach (var r in list) AppLayerRules.Add(r);
+        }
+        OnPropertyChanged(nameof(MatchedAppLayerRule));
+    }
+
+    /// <summary>Appends a rule for the active profile and persists. If a rule
+    /// for the same process (case-insensitive) already exists, updates its
+    /// layer index in place — keeps the user's hand-ordered priority.</summary>
+    public void AddAppLayerRule(string processMatch, int layerIndex)
+    {
+        if (string.IsNullOrWhiteSpace(processMatch)) return;
+        var trimmed = processMatch.Trim();
+        for (var i = 0; i < AppLayerRules.Count; i++)
+        {
+            if (string.Equals(AppLayerRules[i].ProcessMatch, trimmed, StringComparison.OrdinalIgnoreCase))
+            {
+                if (AppLayerRules[i].LayerIndex == layerIndex) return;
+                AppLayerRules[i] = new AppLayerRule(AppLayerRules[i].ProcessMatch, layerIndex);
+                PersistAppLayerRules();
+                OnPropertyChanged(nameof(MatchedAppLayerRule));
+                return;
+            }
+        }
+        AppLayerRules.Add(new AppLayerRule(trimmed, layerIndex));
+        PersistAppLayerRules();
+        OnPropertyChanged(nameof(MatchedAppLayerRule));
+    }
+
+    /// <summary>Removes a rule (by value equality on the record) and persists.</summary>
+    public void RemoveAppLayerRule(AppLayerRule rule)
+    {
+        if (AppLayerRules.Remove(rule))
+        {
+            PersistAppLayerRules();
+            OnPropertyChanged(nameof(MatchedAppLayerRule));
+        }
+    }
+
+    /// <summary>Moves a rule up (delta = -1) or down (delta = +1) in priority
+    /// order. Out-of-range moves are no-ops. Persists on every successful move.</summary>
+    public void MoveAppLayerRule(AppLayerRule rule, int delta)
+    {
+        var i = AppLayerRules.IndexOf(rule);
+        if (i < 0) return;
+        var j = i + delta;
+        if (j < 0 || j >= AppLayerRules.Count) return;
+        AppLayerRules.Move(i, j);
+        PersistAppLayerRules();
+        OnPropertyChanged(nameof(MatchedAppLayerRule));
+    }
+
+    private void PersistAppLayerRules()
+    {
+        var profileId = _profile.Id;
+        var snapshot = AppLayerRules.ToList();
+        PersistSetting(s =>
+        {
+            var clone = new Dictionary<string, List<AppLayerRule>>();
+            foreach (var (pid, list) in s.AppLayerRules)
+                clone[pid] = new List<AppLayerRule>(list);
+            if (snapshot.Count == 0) clone.Remove(profileId);
+            else clone[profileId] = snapshot;
+            return s with { AppLayerRules = clone };
+        });
+    }
+
+    /// <summary>
+    /// Auto-switch engine. Fires on every <see cref="MatchedAppLayerRule"/>
+    /// change (focus change or rule-list mutation). Behaviour:
+    /// <list type="bullet">
+    ///   <item>no-rule → rule: snapshot the current layer, push the rule's layer.</item>
+    ///   <item>rule → rule: push the new layer (snapshot is preserved — Excel → Word → no-rule
+    ///         returns to whatever was active before Excel, not before Word).</item>
+    ///   <item>rule → no-rule: push the fallback (snapshot or layer 0 per
+    ///         <see cref="AutoSwitchFallbackMode"/>) — UNLESS the user manually
+    ///         picked a different layer mid-session, in which case respect
+    ///         their pick and don't push.</item>
+    ///   <item>same rule still matching (window-title churn): no push.</item>
+    /// </list>
+    /// Manual override is detected by comparing <see cref="ActiveLayerIndex"/>
+    /// to the last layer this engine pushed; if they differ on focus-out, the
+    /// user has overridden and the fallback is suppressed.
+    /// </summary>
+    private void TryFireAutoSwitch()
+    {
+        if (!IsAutoSwitchKeyboardLayerEnabled) return;
+        var match = MatchedAppLayerRule;
+
+        if (match is null)
+        {
+            if (_preRuleLayer is null)
+            {
+                // Not in a rule-controlled session (focus moved between two
+                // no-rule apps, or rules were just cleared). Nothing to do.
+                _lastFiredRule = null;
+                _lastAutoSwitchLayer = null;
+                _userExited = false;
+                return;
+            }
+            // Exiting a rule-controlled session. Skip the fallback push if
+            // the user already pushed it themselves via the exit-tap key
+            // (_userExited), or if they manually picked a different layer
+            // mid-session.
+            bool userOverrode = _lastAutoSwitchLayer.HasValue
+                && ActiveLayerIndex != _lastAutoSwitchLayer.Value;
+            if (!userOverrode && !_userExited)
+            {
+                int target = string.Equals(AutoSwitchFallbackMode, AutoSwitchFallbackBase, StringComparison.OrdinalIgnoreCase)
+                    ? 0
+                    : _preRuleLayer.Value;
+                if (target != ActiveLayerIndex)
+                    PushLayerToKeyboard(target);
+            }
+            _preRuleLayer = null;
+            _lastFiredRule = null;
+            _lastAutoSwitchLayer = null;
+            _userExited = false;
+            return;
+        }
+
+        // match is not null — entering or staying in a rule-controlled session.
+        if (_preRuleLayer is null)
+        {
+            // First no-rule → rule transition: snapshot whatever layer is
+            // currently active (may be the user's manual pick from before
+            // the session started).
+            _preRuleLayer = ActiveLayerIndex;
+        }
+
+        // Dedupe on rule value-equality (record equality compares
+        // ProcessMatch + LayerIndex), not just layer index. This suppresses
+        // window-title churn within the same matched process, but still
+        // fires on rule → rule transitions that happen to share a layer
+        // (different rule object, same target).
+        if (match.Equals(_lastFiredRule) && !_userExited) return;
+        PushLayerToKeyboard(match.LayerIndex);
+        _lastFiredRule = match;
+        _lastAutoSwitchLayer = match.LayerIndex;
+        // Any normal focus-driven fire resumes the engine — _userExited only
+        // survives until the next focus change (rule→rule or rule→no-rule).
+        _userExited = false;
+    }
+
+    /// <summary>
+    /// Invoked by <see cref="_exitTapDetector"/> (firmware-thread) when the
+    /// configured exit-tap key is double-tapped. Marshals to the UI thread
+    /// and toggles engine state:
+    /// <list type="bullet">
+    ///   <item>First trigger in a rule-controlled session: push the fallback
+    ///         (per <see cref="AutoSwitchFallbackMode"/>), set
+    ///         <see cref="_userExited"/>. Snapshot is retained — a later
+    ///         focus→no-rule still returns to the original pre-rule layer.</item>
+    ///   <item>Second trigger while the same rule still matches: re-push
+    ///         that rule's layer and clear <see cref="_userExited"/>.</item>
+    ///   <item>Not in a rule session (or master toggle off): no-op.</item>
+    /// </list>
+    /// The detector resets its internal counter after each fire, so this
+    /// never double-fires from a single double-tap.
+    /// </summary>
+    private void OnExitTapTriggered()
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (!IsAutoSwitchKeyboardLayerEnabled) return;
+            var match = MatchedAppLayerRule;
+
+            if (!_userExited)
+            {
+                // Only act if we're actually in a rule-controlled session.
+                if (match is null || _preRuleLayer is null) return;
+
+                int target = string.Equals(AutoSwitchFallbackMode, AutoSwitchFallbackBase, StringComparison.OrdinalIgnoreCase)
+                    ? 0
+                    : _preRuleLayer.Value;
+                if (target != ActiveLayerIndex)
+                    PushLayerToKeyboard(target);
+                _userExited = true;
+                DiagnosticLog.Info("AutoSwitch", $"exit tap: fell back to layer {target} (rule was '{match.ProcessMatch}' → {match.LayerIndex})");
+                return;
+            }
+
+            // _userExited == true: second trigger → re-enter the matching
+            // rule if focus hasn't moved. If focus moved to a no-rule app
+            // we'd already have cleared _userExited via TryFireAutoSwitch,
+            // so this path only runs while still on a rule-matched app.
+            if (match is null) return;
+            if (match.LayerIndex != ActiveLayerIndex)
+                PushLayerToKeyboard(match.LayerIndex);
+            _lastFiredRule = match;
+            _lastAutoSwitchLayer = match.LayerIndex;
+            _userExited = false;
+            DiagnosticLog.Info("AutoSwitch", $"exit tap: re-entered rule '{match.ProcessMatch}' → layer {match.LayerIndex}");
+        });
+    }
+
+    /// <summary>
+    /// Re-evaluates the monitor-should-run predicate
+    /// (<see cref="IsAutoSwitchKeyboardLayerEnabled"/> AND active-keyboard
+    /// rule list is non-empty) and calls Start/Stop on the monitor. Both are
+    /// idempotent. Safe to call from any code path that mutates the toggle,
+    /// the rule list, or the active keyboard profile.
+    /// </summary>
+    private void UpdateActiveWindowMonitorGating()
+    {
+        var monitor = _activeWindowMonitor;
+        if (monitor is null) return;
+        bool shouldRun = IsAutoSwitchKeyboardLayerEnabled && AppLayerRules.Count > 0;
+        if (shouldRun) monitor.Start();
+        else monitor.Stop();
+    }
+
+    public MainWindowViewModel(
+        ISettingsService settingsService,
+        SharpHookProvider? hookProvider = null,
+        IActiveWindowMonitor? activeWindowMonitor = null)
     {
         _settingsService = settingsService;
         _hookProvider = hookProvider;
+        _activeWindowMonitor = activeWindowMonitor;
+        if (_activeWindowMonitor is not null)
+        {
+            _activeWindow = _activeWindowMonitor.Current;
+            _activeWindowMonitor.FocusChanged += HandleActiveWindowFocusChanged;
+        }
         var s = settingsService.Load();
         _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new Go60Profile();
         _selectedKeyboard = _profile;
         _isAlwaysOnTop = s.AlwaysOnTop;
         _isLiveHighlightingEnabled = s.LiveKeyHighlighting;
         _isAutoLayerSwitchEnabled = s.AutoLayerSwitch;
+        // Seed via the backing field to avoid the partial-method side effects
+        // (persist + gating + fire) running during construction before the
+        // rule list is loaded and the monitor reference is even stored.
+        _isAutoSwitchKeyboardLayerEnabled = s.AutoSwitchKeyboardLayer;
         _backgroundOpacity = Math.Clamp(s.BackgroundOpacity, 0.0, 1.0);
         if (!string.IsNullOrWhiteSpace(s.PressHighlightColor))
             _pressHighlightColor = s.PressHighlightColor;
@@ -510,6 +951,28 @@ public partial class MainWindowViewModel : ObservableObject
         // Seed the static palette with persisted per-keyboard, per-layer overrides
         // so the very first paint already reflects the user's customization.
         LayerColorPalette.SetOverrides(s.LayerColors);
+        ReloadAppLayerRules();
+        ReloadAutoSwitchFallback();
+        ReloadExitTapKey();
+        _exitTapDetector.Triggered += OnExitTapTriggered;
+
+        // Auto-switch engine: react to focus-driven match changes (via
+        // MatchedAppLayerRule), and to rule-list mutations (which affect both
+        // the matched rule and the monitor-should-run predicate).
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MatchedAppLayerRule))
+                TryFireAutoSwitch();
+        };
+        AppLayerRules.CollectionChanged += (_, _) =>
+        {
+            UpdateActiveWindowMonitorGating();
+            // Adding a rule that matches the currently focused app should
+            // fire it immediately; removing the last rule clears the dedupe
+            // key so a later re-add of the same rule isn't suppressed.
+            TryFireAutoSwitch();
+        };
+        UpdateActiveWindowMonitorGating();
 
         QuitCommand = new RelayCommand(() => QuitRequested?.Invoke());
         ShowCommand = new RelayCommand(() => ShowWindowRequested?.Invoke());
@@ -750,6 +1213,16 @@ public partial class MainWindowViewModel : ObservableObject
     public void Shutdown()
     {
         StopKeyEventTracking();
+        if (_activeWindowMonitor is not null)
+            _activeWindowMonitor.FocusChanged -= HandleActiveWindowFocusChanged;
+        _exitTapDetector.Triggered -= OnExitTapTriggered;
+    }
+
+    // FocusChanged fires on the monitor's polling thread; marshal to the UI
+    // thread so [ObservableProperty]'s PropertyChanged reaches bindings safely.
+    private void HandleActiveWindowFocusChanged(ActiveWindowInfo info)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => ActiveWindow = info);
     }
 
     // --- Internals ---
@@ -809,6 +1282,16 @@ public partial class MainWindowViewModel : ObservableObject
         _profile = profile;
         SelectedKeyboard = profile;
         BuildKeysFromProfile();
+        ReloadAppLayerRules();
+        ReloadAutoSwitchFallback();
+        ReloadExitTapKey();
+        // Profile switch invalidates the engine state — the snapshot was
+        // captured against the previous keyboard's layer indices and may not
+        // map to anything sensible on the new one.
+        _preRuleLayer = null;
+        _lastFiredRule = null;
+        _lastAutoSwitchLayer = null;
+        _userExited = false;
 
         var layoutFits = _config is not null
             && _config.LayerCount > 0
@@ -899,7 +1382,44 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
-    private void SelectLayer(int index) => ApplyActiveLayer(index);
+    private void SelectLayer(int index)
+    {
+        ApplyActiveLayer(index);
+    }
+
+    public void PushLayerToKeyboard(int index)
+    {
+        var sender = _commandSender;
+        if (sender is null) return;
+
+        // Firmware keeps layer 0 active regardless; bitmask just names the target.
+        uint bitmask = 1u << index;
+        // Arm before sending so the inbound 0xFF reply can be matched as ours.
+        // LayerStateTracker OR's bit 0 in for the firmware's always-on layer 0.
+        _layerStateTracker?.ExpectAppState(bitmask);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await sender.SetLayerStateAsync(bitmask, CancellationToken.None);
+                DiagnosticLog.Info("LayerPush", $"sent layer {index} (mask 0x{bitmask:X})");
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLog.Warn("LayerPush", $"layer {index} failed: {ex.Message}");
+            }
+        });
+    }
+
+    private void OnLayerStateConfirmed(uint bitmask)
+    {
+        var tracker = _layerStateTracker;
+        if (tracker is null) return;
+        if (tracker.IsAppControlled)
+            DiagnosticLog.Info("LayerState", $"app push acknowledged: layer {tracker.HighestActiveLayer} (mask 0x{bitmask:X})");
+        else
+            DiagnosticLog.Info("LayerState", $"external change: layer {tracker.HighestActiveLayer} (mask 0x{bitmask:X})");
+    }
 
     private void ApplyActiveLayer(int index)
     {
@@ -1366,7 +1886,11 @@ public partial class MainWindowViewModel : ObservableObject
         // Moergo boards share VID:PID, so we'd otherwise latch onto whichever
         // is enumerated first). Per-OS transport selection (IOKit / hidraw /
         // HidSharp+WinRT GATT) lives inside ZmkHidProtocol's LayerSourceFactory.
-        var (hidSource, _) = LayerSourceFactory.Create(new KeyboardProfileMatcher(_profile));
+        var (hidSource, hidSink) = LayerSourceFactory.Create(new KeyboardProfileMatcher(_profile));
+        _commandSender = new CommandSender(hidSource, hidSink);
+        _layerStateTracker = new LayerStateTracker();
+        hidSource.ReportReceived += _layerStateTracker.OnReport;
+        _layerStateTracker.StateChanged += OnLayerStateConfirmed;
 
         _layerCoordinator = new LayerSourceCoordinator(hidSource, hotkeyWrapper, _layerSourceMode);
         _layerCoordinator.ActiveLayerChanged += OnActiveLayerChanged;
@@ -1388,6 +1912,13 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void StopKeyEventTracking()
     {
+        _commandSender?.Dispose();
+        _commandSender = null;
+        if (_layerStateTracker is not null)
+        {
+            _layerStateTracker.StateChanged -= OnLayerStateConfirmed;
+            _layerStateTracker = null;
+        }
         if (_layerCoordinator is not null)
         {
             _layerCoordinator.ActiveLayerChanged -= OnActiveLayerChanged;
@@ -1455,6 +1986,11 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     private void OnKeyPositionFromHid(int position, bool pressed)
     {
+        // Feed the exit-tap detector regardless of pressed/released — it
+        // needs releases to re-arm. Null position short-circuits inside
+        // the detector, so this is free when no exit key is configured.
+        _exitTapDetector.OnKeyEvent(position, pressed);
+
         if (!pressed) return;
         if (position < 0 || position >= Keys.Count) return;
         var vm = Keys[position];

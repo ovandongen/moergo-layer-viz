@@ -1,0 +1,54 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:MoergoLayerViz.App.ViewModels"
+        xmlns:views="using:MoergoLayerViz.App.Views"
+        x:Class="MoergoLayerViz.App.Views.ExitKeyPickerWindow"
+        x:DataType="vm:ExitKeyPickerViewModel"
+        Title="{Binding [Settings_AutoSwitch_PickExitKeysTitle], Source={StaticResource Loc}}"
+        Width="560" Height="360"
+        MinWidth="420" MinHeight="280"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner">
+
+    <DockPanel Margin="16">
+
+        <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12" Spacing="6">
+            <TextBlock Text="{Binding [Settings_AutoSwitch_PickExitKeysHint], Source={StaticResource Loc}}"
+                       Foreground="#CDD6F4" FontSize="12" TextWrapping="Wrap" />
+            <TextBlock Text="{Binding [Settings_AutoSwitch_PickExitKeysCandidates], Source={StaticResource Loc}}"
+                       Foreground="#A6ADC8" FontSize="12" TextWrapping="Wrap" FontStyle="Italic" />
+        </StackPanel>
+
+        <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,12,0,0">
+            <TextBlock Grid.Column="0"
+                       Text="{Binding [Settings_AutoSwitch_PickExitKeysSelection], Source={StaticResource Loc}}"
+                       Foreground="#A6ADC8" FontSize="12"
+                       VerticalAlignment="Center"
+                       Margin="0,0,8,0" />
+            <TextBlock Grid.Column="1"
+                       Text="{Binding SelectionSummary}"
+                       Foreground="#A6E3A1" FontSize="12" FontWeight="SemiBold"
+                       VerticalAlignment="Center" />
+            <Button Grid.Column="2" Margin="8,0,0,0"
+                    Content="{Binding [Settings_AutoSwitch_ClearExitKeys], Source={StaticResource Loc}}"
+                    Command="{Binding ClearSelectionCommand}"
+                    IsEnabled="{Binding HasSelection}" />
+            <Button Grid.Column="3" Margin="8,0,0,0"
+                    x:Name="CancelButton"
+                    Content="{Binding [Settings_AutoSwitch_PickExitKeysCancel], Source={StaticResource Loc}}"
+                    Click="OnCancelClick" />
+            <Button Grid.Column="4" Margin="8,0,0,0"
+                    x:Name="OkButton"
+                    Content="{Binding [Settings_AutoSwitch_PickExitKeysOk], Source={StaticResource Loc}}"
+                    Click="OnOkClick"
+                    Classes="accent" />
+        </Grid>
+
+        <Border BorderBrush="#313244" BorderThickness="1" CornerRadius="6"
+                Background="#1E1E2E" Padding="12">
+            <views:BoardView />
+        </Border>
+
+    </DockPanel>
+
+</Window>

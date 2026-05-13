@@ -6,7 +6,7 @@
              xmlns:i="https://github.com/projektanker/icons.avalonia"
              x:Class="MoergoLayerViz.App.Views.BoardView"
              x:Name="Board"
-             x:DataType="vm:MainWindowViewModel">
+             x:DataType="vm:IBoardSurface">
 
     <UserControl.Resources>
         <!-- Palette tuned to the earlier xaml.io sketch. -->
@@ -22,6 +22,8 @@
         <DataTemplate x:Key="KeyTemplate" x:DataType="vm:KeyViewModel">
             <Grid Width="{Binding Position.Width}"
                   Height="{Binding Position.Height}"
+                  Background="Transparent"
+                  PointerPressed="OnKeyPointerPressed"
                   ToolTip.Tip="{Binding Tooltip}">
                 <Grid.RenderTransform>
                     <RotateTransform Angle="{Binding Position.RotationDegrees}" />

@@ -31,9 +31,12 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _mainViewModel = mainViewModel;
         _mainViewModel.PropertyChanged += OnMainPropertyChanged;
         _mainViewModel.Layers.CollectionChanged += OnLayersCollectionChanged;
+        _mainViewModel.AppLayerRules.CollectionChanged += OnAppLayerRulesCollectionChanged;
         _mainViewModel.ManualLayerSignalsChanged += RebuildLayerEntries;
         LayerSourceChoices = BuildLayerSourceChoices();
         RebuildLayerEntries();
+        RebuildAppLayerRuleRows();
+        RefreshRunningProcesses();
     }
 
     /// <summary>(label, value) pair for the layer-source dropdown. Label is pre-localized; value is the canonical mode string persisted in settings.</summary>
@@ -65,6 +68,279 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     /// <summary>"via Raw HID (Go60 Left)" / "via signal macros" — currently active source. Updated live as the coordinator hot-swaps.</summary>
     public string LayerSourceStatus => _mainViewModel.LayerSourceHint;
 
+    // Testing tab — temporary scratch area for poking at HID push without polluting the main page.
+    public ObservableCollection<LayerViewModel> TestLayers => _mainViewModel.Layers;
+
+    private LayerViewModel? _selectedTestLayer;
+    public LayerViewModel? SelectedTestLayer
+    {
+        get => _selectedTestLayer;
+        set
+        {
+            if (SetProperty(ref _selectedTestLayer, value) && value is not null)
+                _mainViewModel.PushLayerToKeyboard(value.Index);
+        }
+    }
+
+    // Active-window passthroughs (Phase 1 diagnostic surface on the Testing
+    // tab). Re-raised inside OnMainPropertyChanged when ActiveWindow changes
+    // on the main VM.
+    public string ActiveProcessName => _mainViewModel.ActiveWindow?.ProcessName ?? "(none)";
+    public string ActiveBundleId => _mainViewModel.ActiveWindow?.BundleId ?? "(none)";
+    public string ActiveWindowTitle => _mainViewModel.ActiveWindow?.WindowTitle ?? "(none)";
+
+    // --- Auto-switch (Phase 2: author + persist rules, preview match;
+    //                   Phase 3 Slice A: master toggle drives firing + monitor gating) ---
+
+    /// <summary>Two-way pass-through to <see cref="MainWindowViewModel.IsAutoSwitchKeyboardLayerEnabled"/>.
+    /// Master on/off for the auto-switch engine.</summary>
+    public bool IsAutoSwitchKeyboardLayerEnabled
+    {
+        get => _mainViewModel.IsAutoSwitchKeyboardLayerEnabled;
+        set
+        {
+            if (_mainViewModel.IsAutoSwitchKeyboardLayerEnabled == value) return;
+            _mainViewModel.IsAutoSwitchKeyboardLayerEnabled = value;
+            OnPropertyChanged();
+        }
+    }
+
+    // Fallback mode — bound to two radio buttons. Avalonia ToggleButton's
+    // IsChecked binds bidirectionally to a bool per radio; both radios share
+    // the GroupName so only one is ever true. Each property routes
+    // through MainWindowViewModel.AutoSwitchFallbackMode (persisted per-keyboard).
+
+    public bool IsFallbackPrevious
+    {
+        get => string.Equals(_mainViewModel.AutoSwitchFallbackMode,
+            MainWindowViewModel.AutoSwitchFallbackPrevious, StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            if (!value) return;
+            if (IsFallbackPrevious) return;
+            _mainViewModel.AutoSwitchFallbackMode = MainWindowViewModel.AutoSwitchFallbackPrevious;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsFallbackBase));
+        }
+    }
+
+    public bool IsFallbackBase
+    {
+        get => string.Equals(_mainViewModel.AutoSwitchFallbackMode,
+            MainWindowViewModel.AutoSwitchFallbackBase, StringComparison.OrdinalIgnoreCase);
+        set
+        {
+            if (!value) return;
+            if (IsFallbackBase) return;
+            _mainViewModel.AutoSwitchFallbackMode = MainWindowViewModel.AutoSwitchFallbackBase;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsFallbackPrevious));
+        }
+    }
+
+    /// <summary>Human-readable summary of the active keyboard's exit-tap
+    /// key (e.g. "#42") or a localized "(none)" when unset. Drives the
+    /// label next to the "Pick…" button.</summary>
+    public string ExitTapSummary
+    {
+        get
+        {
+            var key = _mainViewModel.ExitTapKey;
+            if (key is null) return Loc.Instance["Settings_AutoSwitch_ExitKeysNone"];
+            return $"#{key.Value}";
+        }
+    }
+
+    /// <summary>True when an exit-tap key is configured for the active
+    /// keyboard. Drives the IsEnabled state of the Clear button.</summary>
+    public bool HasExitTap => _mainViewModel.ExitTapKey is not null;
+
+    /// <summary>Snapshot of the currently-configured exit-tap key, used by
+    /// the SettingsWindow code-behind to seed the picker dialog.</summary>
+    public int? ExitTapKey => _mainViewModel.ExitTapKey;
+
+    /// <summary>Applies a freshly-picked exit-tap key. Called by the
+    /// SettingsWindow code-behind after the picker dialog closes with an
+    /// OK result.</summary>
+    public void ApplyExitTapKey(int? index)
+    {
+        _mainViewModel.SetExitTapKey(index);
+    }
+
+    [RelayCommand]
+    private void ClearExitTap() => _mainViewModel.SetExitTapKey(null);
+
+    /// <summary>Active keyboard profile. The SettingsWindow code-behind reads
+    /// this when building an <see cref="ExitKeyPickerViewModel"/> so the
+    /// picker renders the keyboard the user is configuring.</summary>
+    public Core.Layout.IKeyboardProfile ActiveKeyboardProfile => _mainViewModel.SelectedKeyboard;
+
+
+    /// <summary>UI-side rule list. Wraps each <see cref="AppLayerRule"/> with a
+    /// pre-formatted <c>LayerLabel</c>. Rebuilt when the underlying rule list
+    /// changes (add/remove) or when <c>Layers</c> changes (keymap reload).</summary>
+    public ObservableCollection<AppLayerRuleRow> AppLayerRuleRows { get; } = new();
+
+    /// <summary>Layers available as rule targets — same source as the Testing tab combo.</summary>
+    public ObservableCollection<LayerViewModel> AutoSwitchLayers => _mainViewModel.Layers;
+
+    /// <summary>Text typed into the "new rule" process-name field. Capped at
+    /// 200 chars in the XAML; keeps the settings file from ballooning on
+    /// malformed input.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddAppLayerRuleCommand))]
+    private string _newRuleProcessMatch = "";
+
+    /// <summary>Layer selected in the "new rule" dropdown.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddAppLayerRuleCommand))]
+    private LayerViewModel? _newRuleLayer;
+
+    private bool CanAddAppLayerRule() =>
+        !string.IsNullOrWhiteSpace(NewRuleProcessMatch) && NewRuleLayer is not null;
+
+    [RelayCommand(CanExecute = nameof(CanAddAppLayerRule))]
+    private void AddAppLayerRule()
+    {
+        if (NewRuleLayer is null) return;
+        _mainViewModel.AddAppLayerRule(NewRuleProcessMatch, NewRuleLayer.Index);
+        NewRuleProcessMatch = "";
+    }
+
+    [RelayCommand]
+    private void RemoveAppLayerRule(AppLayerRuleRow? row)
+    {
+        if (row is null) return;
+        _mainViewModel.RemoveAppLayerRule(row.Rule);
+    }
+
+    [RelayCommand]
+    private void MoveAppLayerRuleUp(AppLayerRuleRow? row)
+    {
+        if (row is null) return;
+        _mainViewModel.MoveAppLayerRule(row.Rule, -1);
+    }
+
+    [RelayCommand]
+    private void MoveAppLayerRuleDown(AppLayerRuleRow? row)
+    {
+        if (row is null) return;
+        _mainViewModel.MoveAppLayerRule(row.Rule, +1);
+    }
+
+    /// <summary>
+    /// Localized "Would fire: layer N" readout for the currently focused app,
+    /// or a "no match" hint. Phase 3 will turn this into the actual push.
+    /// </summary>
+    public string WouldFireText
+    {
+        get
+        {
+            var match = _mainViewModel.MatchedAppLayerRule;
+            if (match is null) return Loc.Instance["Settings_AutoSwitch_WouldFireNone"];
+            return Loc.Instance.Format("Settings_AutoSwitch_WouldFireFormat", FormatLayerLabel(match.LayerIndex));
+        }
+    }
+
+    /// <summary>"Symbol (L:1)" for a known layer, or "(invalid layer)" if the
+    /// rule points at an index no longer present in the active keymap. Shared
+    /// by the rules-list rows and the WouldFire readout.</summary>
+    private string FormatLayerLabel(int layerIndex)
+    {
+        var layer = _mainViewModel.Layers.FirstOrDefault(l => l.Index == layerIndex);
+        if (layer is null) return Loc.Instance["Settings_AutoSwitch_LayerInvalid"];
+        return Loc.Instance.Format("Settings_AutoSwitch_LayerFormat", layer.DisplayName, layer.Index);
+    }
+
+    private void RebuildAppLayerRuleRows()
+    {
+        AppLayerRuleRows.Clear();
+        foreach (var r in _mainViewModel.AppLayerRules)
+            AppLayerRuleRows.Add(new AppLayerRuleRow(r, FormatLayerLabel(r.LayerIndex)));
+    }
+
+    private void OnAppLayerRulesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e) =>
+        RebuildAppLayerRuleRows();
+
+    // --- Process picker -------------------------------------------------
+
+    /// <summary>Full snapshot of running-process names, dedup'd + sorted. Source
+    /// of truth for the visible <see cref="RunningProcessNames"/> after the
+    /// filter is applied.</summary>
+    private readonly List<string> _allRunningProcessNames = new();
+
+    /// <summary>Filtered, visible picker list. Case-insensitive substring match
+    /// against <see cref="ProcessFilter"/>; equals the full snapshot when the
+    /// filter is empty.</summary>
+    public ObservableCollection<string> RunningProcessNames { get; } = new();
+
+    /// <summary>True when the filtered list is empty. XAML swaps the picker
+    /// list for the localized empty-state hint when this is false.</summary>
+    public bool HasRunningProcesses => RunningProcessNames.Count > 0;
+
+    /// <summary>Filter text typed into the picker. Live-applied to the visible
+    /// list on every keystroke.</summary>
+    [ObservableProperty]
+    private string _processFilter = "";
+
+    partial void OnProcessFilterChanged(string value) => ApplyProcessFilter();
+
+    /// <summary>Invoked by the SettingsWindow code-behind right before the
+    /// picker flyout opens. Cross-OS via <see cref="System.Diagnostics.Process.GetProcesses"/>
+    /// — same source as <c>IActiveWindowMonitor.ProcessName</c>, so what the
+    /// user picks here matches what the monitor will report later. Clears the
+    /// active filter so each open starts fresh.</summary>
+    public void RefreshRunningProcesses()
+    {
+        var names = new List<string>();
+        foreach (var p in System.Diagnostics.Process.GetProcesses())
+        {
+            try
+            {
+                var name = p.ProcessName;
+                if (!string.IsNullOrWhiteSpace(name)) names.Add(name);
+            }
+            catch
+            {
+                // Access denied on protected processes is normal — skip.
+            }
+            finally
+            {
+                p.Dispose();
+            }
+        }
+        _allRunningProcessNames.Clear();
+        _allRunningProcessNames.AddRange(names
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(n => n, StringComparer.OrdinalIgnoreCase));
+        ProcessFilter = "";
+        ApplyProcessFilter();
+    }
+
+    private void ApplyProcessFilter()
+    {
+        var filter = ProcessFilter?.Trim() ?? "";
+        RunningProcessNames.Clear();
+        foreach (var n in _allRunningProcessNames)
+        {
+            if (filter.Length == 0 ||
+                n.Contains(filter, StringComparison.OrdinalIgnoreCase))
+            {
+                RunningProcessNames.Add(n);
+            }
+        }
+        OnPropertyChanged(nameof(HasRunningProcesses));
+    }
+
+    /// <summary>Picker item selected → drop the name into the textbox. The
+    /// flyout closes itself on selection (Avalonia default).</summary>
+    [RelayCommand]
+    private void PickProcess(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return;
+        NewRuleProcessMatch = name!;
+    }
+
     /// <summary>
     /// Detaches the long-lived <see cref="MainWindowViewModel"/> event hooks
     /// so this VM (and its window's whole DataContext graph) becomes
@@ -78,6 +354,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _disposed = true;
         _mainViewModel.PropertyChanged -= OnMainPropertyChanged;
         _mainViewModel.Layers.CollectionChanged -= OnLayersCollectionChanged;
+        _mainViewModel.AppLayerRules.CollectionChanged -= OnAppLayerRulesCollectionChanged;
         _mainViewModel.ManualLayerSignalsChanged -= RebuildLayerEntries;
     }
 
@@ -184,16 +461,51 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             // Header + per-profile content (color overrides, manual signals)
             // are scoped to the active profile.
             RebuildLayerEntries();
+            OnPropertyChanged(nameof(ActiveKeyboardProfile));
+            // Exit-tap key is per-keyboard; the main VM reloads it during
+            // SelectKeyboard, but we re-raise here in case bindings haven't
+            // observed the change yet.
+            OnPropertyChanged(nameof(ExitTapKey));
+            OnPropertyChanged(nameof(ExitTapSummary));
+            OnPropertyChanged(nameof(HasExitTap));
         }
         else if (e.PropertyName == nameof(MainWindowViewModel.LayerSourceHint))
         {
             OnPropertyChanged(nameof(LayerSourceStatus));
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.ActiveWindow))
+        {
+            OnPropertyChanged(nameof(ActiveProcessName));
+            OnPropertyChanged(nameof(ActiveBundleId));
+            OnPropertyChanged(nameof(ActiveWindowTitle));
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.MatchedAppLayerRule))
+        {
+            OnPropertyChanged(nameof(WouldFireText));
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.IsAutoSwitchKeyboardLayerEnabled))
+        {
+            OnPropertyChanged(nameof(IsAutoSwitchKeyboardLayerEnabled));
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.AutoSwitchFallbackMode))
+        {
+            OnPropertyChanged(nameof(IsFallbackPrevious));
+            OnPropertyChanged(nameof(IsFallbackBase));
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.ExitTapKey))
+        {
+            OnPropertyChanged(nameof(ExitTapKey));
+            OnPropertyChanged(nameof(ExitTapSummary));
+            OnPropertyChanged(nameof(HasExitTap));
         }
     }
 
     private void OnLayersCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {
         RebuildLayerEntries();
+        // A keymap reload renames or renumbers layers — any rule rows that
+        // had "(invalid layer)" might resolve now (and vice versa).
+        RebuildAppLayerRuleRows();
     }
 
     /// <summary>

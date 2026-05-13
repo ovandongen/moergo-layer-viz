@@ -14,6 +14,7 @@ using MoergoLayerViz.Core.Diagnostics;
 using MoergoLayerViz.Core.Settings;
 using Projektanker.Icons.Avalonia;
 using Projektanker.Icons.Avalonia.FontAwesome;
+using ZmkHidProtocol.ActiveWindow;
 
 namespace MoergoLayerViz.App;
 
@@ -67,8 +68,21 @@ public partial class App : Application
                 desktop.Exit += (_, _) => hookProvider.Dispose();
             }
 
+            // Construct only — MainWindowViewModel calls Start/Stop on demand
+            // based on the master toggle and rule-list state. App owns disposal.
+            IActiveWindowMonitor? activeWindowMonitor = null;
+            try
+            {
+                activeWindowMonitor = ActiveWindowMonitorFactory.Create();
+                desktop.Exit += (_, _) => activeWindowMonitor.Dispose();
+            }
+            catch (Exception ex)
+            {
+                DiagnosticLog.Warn("Startup", $"ActiveWindowMonitor unavailable: {ex.Message}");
+            }
+
             DiagnosticLog.Info("Startup", "Creating MainWindowViewModel...");
-            var viewModel = new MainWindowViewModel(settingsService, hookProvider);
+            var viewModel = new MainWindowViewModel(settingsService, hookProvider, activeWindowMonitor);
             var mainWindow = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = mainWindow;
 

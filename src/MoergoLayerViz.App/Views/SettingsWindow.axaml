@@ -4,6 +4,7 @@
         xmlns:conv="using:MoergoLayerViz.App.Converters"
         x:Class="MoergoLayerViz.App.Views.SettingsWindow"
         x:DataType="vm:SettingsViewModel"
+        Name="SettingsRoot"
         Title="{Binding [Title_Settings], Source={StaticResource Loc}}"
         Width="560" Height="640"
         MinWidth="420" MinHeight="320"
@@ -220,6 +221,198 @@
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
 
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- Auto-switch tab: per-keyboard rules mapping focused app → ZMK layer.
+             Phase 2 is data-only: rules persist and the readout shows which one
+             would fire for the currently focused app; Phase 3 wires the push. -->
+        <TabItem Header="{Binding [Settings_Tab_AutoSwitch], Source={StaticResource Loc}}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="12">
+                    <TextBlock Text="{Binding [Settings_AutoSwitch_Header], Source={StaticResource Loc}}"
+                               FontSize="14" FontWeight="SemiBold" Foreground="#CDD6F4" />
+                    <TextBlock Text="{Binding [Settings_AutoSwitch_Hint], Source={StaticResource Loc}}"
+                               Foreground="#6C7086" FontSize="11" TextWrapping="Wrap" />
+
+                    <CheckBox Content="{Binding [Settings_AutoSwitch_Enable], Source={StaticResource Loc}}"
+                              IsChecked="{Binding IsAutoSwitchKeyboardLayerEnabled, Mode=TwoWay}"
+                              Foreground="#CDD6F4" />
+
+                    <StackPanel Spacing="4" Margin="0,4,0,0">
+                        <TextBlock Text="{Binding [Settings_AutoSwitch_FallbackLabel], Source={StaticResource Loc}}"
+                                   Foreground="#CDD6F4" FontSize="12" />
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <RadioButton GroupName="AutoSwitchFallback"
+                                         Content="{Binding [Settings_AutoSwitch_FallbackPrevious], Source={StaticResource Loc}}"
+                                         IsChecked="{Binding IsFallbackPrevious, Mode=TwoWay}"
+                                         Foreground="#CDD6F4" />
+                            <RadioButton GroupName="AutoSwitchFallback"
+                                         Content="{Binding [Settings_AutoSwitch_FallbackBase], Source={StaticResource Loc}}"
+                                         IsChecked="{Binding IsFallbackBase, Mode=TwoWay}"
+                                         Foreground="#CDD6F4" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Exit-tap key: a single firmware key position that
+                         toggles the engine between the rule-driven layer
+                         and the fallback target when double-tapped. Pressed
+                         on the physical keyboard; we consume the firmware
+                         key events (regardless of OS keypress permission)
+                         via the submodule's MultiTapDetector. -->
+                    <StackPanel Spacing="4" Margin="0,4,0,0">
+                        <TextBlock Text="{Binding [Settings_AutoSwitch_ExitKeysLabel], Source={StaticResource Loc}}"
+                                   Foreground="#CDD6F4" FontSize="12" />
+                        <TextBlock Text="{Binding [Settings_AutoSwitch_ExitKeysHint], Source={StaticResource Loc}}"
+                                   Foreground="#6C7086" FontSize="11" TextWrapping="Wrap" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                            <TextBlock Text="{Binding ExitTapSummary}"
+                                       Foreground="#A6E3A1" FontSize="12" FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       MinWidth="160" />
+                            <Button Content="{Binding [Settings_AutoSwitch_PickExitKeys], Source={StaticResource Loc}}"
+                                    Click="OnPickExitKeysClick" />
+                            <Button Content="{Binding [Settings_AutoSwitch_ClearExitKeys], Source={StaticResource Loc}}"
+                                    Command="{Binding ClearExitTapCommand}"
+                                    IsEnabled="{Binding HasExitTap}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- New-rule editor. MaxLength caps the textbox so a
+                         paste-bomb can't bloat settings.json. The Pick…
+                         button opens a flyout listing running processes
+                         (refreshed on each open via code-behind). -->
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,4,0,0">
+                        <TextBox Grid.Column="0"
+                                 Watermark="{Binding [Settings_AutoSwitch_ProcessMatch], Source={StaticResource Loc}}"
+                                 Text="{Binding NewRuleProcessMatch, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                 MaxLength="200"
+                                 VerticalAlignment="Center" />
+                        <Button x:Name="PickProcessButton" Grid.Column="1" Margin="8,0,0,0"
+                                Content="{Binding [Settings_AutoSwitch_PickProcess], Source={StaticResource Loc}}">
+                            <Button.Flyout>
+                                <Flyout Placement="Bottom">
+                                    <Grid Width="260" Height="320" RowDefinitions="Auto,*">
+                                        <TextBox Grid.Row="0" Margin="0,0,0,4"
+                                                 Watermark="{Binding [Settings_AutoSwitch_PickProcessFilter], Source={StaticResource Loc}}"
+                                                 Text="{Binding ProcessFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                        <ListBox Grid.Row="1"
+                                                 x:Name="ProcessPickerList"
+                                                 ItemsSource="{Binding RunningProcessNames}"
+                                                 IsVisible="{Binding HasRunningProcesses}"
+                                                 SelectionChanged="OnProcessPickerSelectionChanged">
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" Padding="4,2" />
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                        <TextBlock Grid.Row="1"
+                                                   Text="{Binding [Settings_AutoSwitch_PickProcessEmpty], Source={StaticResource Loc}}"
+                                                   Foreground="#6C7086" FontStyle="Italic"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                   IsVisible="{Binding !HasRunningProcesses}" />
+                                    </Grid>
+                                </Flyout>
+                            </Button.Flyout>
+                        </Button>
+                        <ComboBox Grid.Column="2" Margin="8,0,0,0" MinWidth="160"
+                                  ItemsSource="{Binding AutoSwitchLayers}"
+                                  SelectedItem="{Binding NewRuleLayer, Mode=TwoWay}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LayerViewModel">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Grid.Column="3" Margin="8,0,0,0"
+                                Content="{Binding [Settings_AutoSwitch_Add], Source={StaticResource Loc}}"
+                                Command="{Binding AddAppLayerRuleCommand}" />
+                    </Grid>
+
+                    <Border Height="1" Background="#313244" Margin="0,4" />
+
+                    <!-- Empty-state hint -->
+                    <TextBlock Text="{Binding [Settings_AutoSwitch_Empty], Source={StaticResource Loc}}"
+                               Foreground="#6C7086" FontSize="11" FontStyle="Italic"
+                               IsVisible="{Binding AppLayerRuleRows.Count, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=0}" />
+
+                    <!-- Existing rules. Remove command lives on the SettingsViewModel
+                         (the window's DataContext), so we reach it via ElementName
+                         binding — the (vm:T)DataContext cast pattern is unreliable
+                         inside deferred templates (see CLAUDE.md). -->
+                    <ItemsControl ItemsSource="{Binding AppLayerRuleRows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,200,Auto,Auto,Auto" Margin="0,3,0,3">
+                                    <TextBlock Grid.Column="0"
+                                               Text="{Binding ProcessMatch}"
+                                               Foreground="#CDD6F4"
+                                               VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding LayerLabel}"
+                                               Foreground="#A6ADC8"
+                                               VerticalAlignment="Center" />
+                                    <Button Grid.Column="2" Content="▲" Padding="6,2" MinWidth="0"
+                                            ToolTip.Tip="{Binding [Settings_AutoSwitch_MoveUp], Source={StaticResource Loc}}"
+                                            Command="{Binding DataContext.MoveAppLayerRuleUpCommand, ElementName=SettingsRoot}"
+                                            CommandParameter="{Binding}" />
+                                    <Button Grid.Column="3" Content="▼" Padding="6,2" MinWidth="0" Margin="2,0,0,0"
+                                            ToolTip.Tip="{Binding [Settings_AutoSwitch_MoveDown], Source={StaticResource Loc}}"
+                                            Command="{Binding DataContext.MoveAppLayerRuleDownCommand, ElementName=SettingsRoot}"
+                                            CommandParameter="{Binding}" />
+                                    <Button Grid.Column="4" Margin="8,0,0,0"
+                                            Content="{Binding [Settings_AutoSwitch_Remove], Source={StaticResource Loc}}"
+                                            Command="{Binding DataContext.RemoveAppLayerRuleCommand, ElementName=SettingsRoot}"
+                                            CommandParameter="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Border Height="1" Background="#313244" Margin="0,4" />
+
+                    <TextBlock Text="{Binding WouldFireText}"
+                               Foreground="#A6E3A1" FontSize="12" />
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
+        <!-- Testing tab: temporary scratch area for HID push tests. Remove when done. -->
+        <TabItem Header="Testing">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="12">
+                    <TextBlock Text="Push layer to keyboard"
+                               FontSize="14" FontWeight="SemiBold" Foreground="#CDD6F4" />
+                    <TextBlock Text="Selecting a layer fires SetLayerStateAsync immediately. See log for app push acknowledged / external change events."
+                               Foreground="#6C7086" FontSize="11" TextWrapping="Wrap" />
+                    <ComboBox MinWidth="220"
+                              HorizontalAlignment="Left"
+                              ItemsSource="{Binding TestLayers}"
+                              SelectedItem="{Binding SelectedTestLayer, Mode=TwoWay}">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LayerViewModel">
+                                <TextBlock Text="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+
+                    <Separator Margin="0,8" />
+
+                    <TextBlock Text="Active window (focus follows OS)"
+                               FontSize="14" FontWeight="SemiBold" Foreground="#CDD6F4" />
+                    <TextBlock Text="Updates within ~500 ms of focus change. WindowTitle is null on macOS by design (no Accessibility entitlement)."
+                               Foreground="#6C7086" FontSize="11" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="120,*" RowDefinitions="Auto,Auto,Auto" Margin="0,4,0,0">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="ProcessName" Foreground="#6C7086" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding ActiveProcessName}" Foreground="#CDD6F4" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="BundleId" Foreground="#6C7086" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding ActiveBundleId}" Foreground="#CDD6F4" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="WindowTitle" Foreground="#6C7086" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding ActiveWindowTitle}" Foreground="#CDD6F4" TextWrapping="Wrap" />
+                    </Grid>
                 </StackPanel>
             </ScrollViewer>
         </TabItem>

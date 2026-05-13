@@ -117,4 +117,45 @@ public record UserSettings
     /// entirely and uses only the F-key signal-macro path.
     /// </summary>
     public string LayerSource { get; init; } = "Auto";
+
+    /// <summary>
+    /// Per-keyboard app→layer rules. Outer key = profile id, value = ordered
+    /// list of <see cref="AppLayerRule"/>; the first match (case-insensitive
+    /// substring of ProcessName) wins.
+    /// </summary>
+    public Dictionary<string, List<AppLayerRule>> AppLayerRules { get; init; } = new();
+
+    /// <summary>
+    /// Master on/off toggle for firing <see cref="AppLayerRules"/> on focus
+    /// change. Default off: rules persist but do nothing until the user opts
+    /// in. Also gates the <c>IActiveWindowMonitor</c> lifetime — when off (or
+    /// when no rules exist for the active keyboard), the monitor is stopped.
+    /// </summary>
+    public bool AutoSwitchKeyboardLayer { get; init; } = false;
+
+    /// <summary>
+    /// Per-keyboard fallback target when focus moves away from any matched
+    /// app. Outer key = profile id, value = <c>"Previous"</c> (default —
+    /// restore the layer that was active when the rule-controlled session
+    /// began) or <c>"Base"</c> (always push layer 0). Missing entries
+    /// resolve to <c>"Previous"</c>.
+    /// </summary>
+    public Dictionary<string, string> AutoSwitchFallback { get; init; } = new();
+
+    /// <summary>
+    /// Per-keyboard "escape hatch" key for the auto-switch engine: a single
+    /// firmware key index (matrix position) that, when double-tapped within
+    /// the submodule <c>MultiTapDetector</c>'s window, toggles the engine
+    /// between the rule-driven layer and the fallback target. Missing means
+    /// no exit key is configured for that keyboard — the firmware key events
+    /// are ignored. The index matches
+    /// <see cref="MoergoLayerViz.Core.Layout.KeyPosition.Index"/> which the
+    /// firmware reports verbatim, so no translation is needed.
+    /// </summary>
+    /// <remarks>
+    /// Pick a position whose binding doesn't emit OS keystrokes (e.g.
+    /// Moergo's <c>&amp;magic</c>) so the firmware key reports flow through
+    /// but no spurious text reaches the focused window.
+    /// </remarks>
+    public Dictionary<string, int> AutoSwitchExitKey { get; init; } = new();
 }
