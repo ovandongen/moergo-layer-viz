@@ -1,5 +1,6 @@
 using System.IO;
 using MoergoLayerViz.App.ViewModels;
+using MoergoLayerViz.Core.Keymap;
 using MoergoLayerViz.Core.Settings;
 using Xunit;
 
@@ -106,7 +107,7 @@ public class HoldTapLayerNameTests
     [InlineData("UPPER", "UPPER")]               // all-uppercase acronym preserved
     public void FormatLayerName_InsertsBreaksOnUnderscoreAndCamelCase(string input, string expected)
     {
-        Assert.Equal(expected, KeyViewModel.FormatLayerName(input));
+        Assert.Equal(expected, KeyLabelFormatter.FormatLayerName(input));
     }
 
     [Fact]

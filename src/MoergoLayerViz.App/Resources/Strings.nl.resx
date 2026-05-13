@@ -155,6 +155,9 @@
   <data name="Settings_AutoSwitch_PickProcessFilter"><value>Filteren…</value></data>
   <data name="Settings_AutoSwitch_LayerFormat"><value>{0} (L:{1})</value></data>
   <data name="Settings_AutoSwitch_LayerInvalid"><value>(ongeldige laag)</value></data>
+  <data name="Settings_AutoSwitch_SectionEngine"><value>Motor</value></data>
+  <data name="Settings_AutoSwitch_SectionExitKey"><value>Ontsnap-toets</value></data>
+  <data name="Settings_AutoSwitch_SectionRules"><value>Regels</value></data>
   <data name="Settings_LayersFormat"><value>Lagen — {0}</value></data>
   <data name="Settings_LayersHint"><value>Pas per laag de kleur en signaaltoets aan. Lagen met een automatisch herkende signaalmacro tonen de keycode alleen-lezen; voor de overige kies je handmatig een F-toets zodat live tracking de laag kan volgen.</value></data>
   <data name="Settings_LayerColorsReset"><value>Terugzetten</value></data>

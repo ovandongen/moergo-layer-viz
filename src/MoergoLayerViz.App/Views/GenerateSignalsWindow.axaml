@@ -13,26 +13,26 @@
 
             <!-- Header -->
             <TextBlock Text="{Binding [Generate_Heading], Source={StaticResource Loc}}"
-                       FontSize="16" FontWeight="SemiBold" Foreground="#CDD6F4" />
+                       FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
             <TextBlock Text="{Binding [Generate_Description], Source={StaticResource Loc}}"
-                       Foreground="#A6ADC8" FontSize="12" TextWrapping="Wrap" />
+                       Foreground="{StaticResource TextSubtle}" FontSize="12" TextWrapping="Wrap" />
 
-            <Border Height="1" Background="#313244" />
+            <Border Height="1" Background="{StaticResource BgSurface0}" />
 
             <!-- Loaded layout indicator -->
             <StackPanel Spacing="4">
                 <TextBlock Text="{Binding [Generate_LoadedLayout], Source={StaticResource Loc}}"
-                           FontSize="13" FontWeight="SemiBold" Foreground="#CDD6F4" />
+                           FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                 <TextBlock Text="{Binding LoadedLayoutDisplay}"
-                           Foreground="#A6E3A1" FontSize="12" />
+                           Foreground="{StaticResource AccentGreen}" FontSize="12" />
             </StackPanel>
 
             <!-- Layer selection -->
             <StackPanel Spacing="6" IsVisible="{Binding Layers.Count}">
                 <TextBlock Text="{Binding [Generate_LayersHeading], Source={StaticResource Loc}}"
-                           FontSize="13" FontWeight="SemiBold" Foreground="#CDD6F4" />
+                           FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                 <TextBlock Text="{Binding [Generate_LayersHint], Source={StaticResource Loc}}"
-                           Foreground="#6C7086" FontSize="11" TextWrapping="Wrap" />
+                           Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <Button Content="{Binding [Generate_SelectAll], Source={StaticResource Loc}}"
                             Command="{Binding SelectAllCommand}"
@@ -41,8 +41,8 @@
                             Command="{Binding ClearSelectionCommand}"
                             Padding="10,3" FontSize="11" />
                 </StackPanel>
-                <Border BorderBrush="#313244" BorderThickness="1" CornerRadius="4"
-                        Background="#181825">
+                <Border BorderBrush="{StaticResource BgSurface0}" BorderThickness="1" CornerRadius="4"
+                        Background="{StaticResource BgCrust}">
                     <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
                         <ItemsControl ItemsSource="{Binding Layers}">
                             <ItemsControl.ItemTemplate>
@@ -52,12 +52,12 @@
                                                   IsChecked="{Binding IsSelected, Mode=TwoWay}" />
                                         <TextBlock Grid.Column="1"
                                                    Text="{Binding Label}"
-                                                   Foreground="#CDD6F4" FontSize="12"
+                                                   Foreground="{StaticResource Text}" FontSize="12"
                                                    VerticalAlignment="Center"
                                                    Margin="6,0,0,0" />
                                         <TextBlock Grid.Column="2"
                                                    Text="{Binding ProjectedFkey}"
-                                                   Foreground="#94E2D5" FontSize="11"
+                                                   Foreground="{StaticResource AccentTeal}" FontSize="11"
                                                    FontFamily="Consolas, Menlo, monospace"
                                                    VerticalAlignment="Center" />
                                     </Grid>
@@ -71,9 +71,9 @@
             <!-- Start Fkey -->
             <StackPanel Spacing="6">
                 <TextBlock Text="{Binding [Generate_StartFkey], Source={StaticResource Loc}}"
-                           FontSize="13" FontWeight="SemiBold" Foreground="#CDD6F4" />
+                           FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                 <TextBlock Text="{Binding [Generate_StartFkeyHint], Source={StaticResource Loc}}"
-                           Foreground="#6C7086" FontSize="11" TextWrapping="Wrap" />
+                           Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
                 <NumericUpDown Value="{Binding StartFkey, Mode=TwoWay}"
                                Minimum="{Binding MinFkey}"
                                Maximum="{Binding MaxFkey}"
@@ -89,34 +89,34 @@
                         Command="{Binding GenerateCommand}"
                         IsEnabled="{Binding !IsBusy}"
                         Padding="14,6"
-                        Background="#89B4FA"
-                        Foreground="#1E1E2E"
+                        Background="{StaticResource AccentBlue}"
+                        Foreground="{StaticResource BgBase}"
                         FontWeight="SemiBold" />
                 <TextBlock Text="{Binding StatusMessage}"
                            VerticalAlignment="Center"
-                           Foreground="#F9E2AF"
+                           Foreground="{StaticResource AccentYellow}"
                            TextWrapping="Wrap" />
             </StackPanel>
 
             <!-- Results panel — only after a successful generation -->
             <Border IsVisible="{Binding HasResult}"
-                    Background="#181825"
-                    BorderBrush="#313244" BorderThickness="1"
+                    Background="{StaticResource BgCrust}"
+                    BorderBrush="{StaticResource BgSurface0}" BorderThickness="1"
                     CornerRadius="6"
                     Padding="14">
                 <StackPanel Spacing="12">
 
                     <TextBlock Text="{Binding [Generate_ResultsHeading], Source={StaticResource Loc}}"
-                               FontSize="13" FontWeight="SemiBold" Foreground="#CDD6F4" />
+                               FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
 
                     <!-- Added -->
                     <StackPanel Spacing="4" IsVisible="{Binding AddedItems.Count}">
                         <TextBlock Text="{Binding [Generate_Added], Source={StaticResource Loc}}"
-                                   FontWeight="SemiBold" Foreground="#A6E3A1" FontSize="12" />
+                                   FontWeight="SemiBold" Foreground="{StaticResource AccentGreen}" FontSize="12" />
                         <ItemsControl ItemsSource="{Binding AddedItems}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding}" Foreground="#CDD6F4" FontSize="11"
+                                    <TextBlock Text="{Binding}" Foreground="{StaticResource Text}" FontSize="11"
                                                FontFamily="Consolas, Menlo, monospace" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -126,11 +126,11 @@
                     <!-- Skipped -->
                     <StackPanel Spacing="4" IsVisible="{Binding SkippedItems.Count}">
                         <TextBlock Text="{Binding [Generate_Skipped], Source={StaticResource Loc}}"
-                                   FontWeight="SemiBold" Foreground="#94E2D5" FontSize="12" />
+                                   FontWeight="SemiBold" Foreground="{StaticResource AccentTeal}" FontSize="12" />
                         <ItemsControl ItemsSource="{Binding SkippedItems}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding}" Foreground="#A6ADC8" FontSize="11"
+                                    <TextBlock Text="{Binding}" Foreground="{StaticResource TextSubtle}" FontSize="11"
                                                FontFamily="Consolas, Menlo, monospace" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
@@ -140,25 +140,25 @@
                     <!-- Warnings -->
                     <StackPanel Spacing="4" IsVisible="{Binding Warnings.Count}">
                         <TextBlock Text="{Binding [Generate_Warnings], Source={StaticResource Loc}}"
-                                   FontWeight="SemiBold" Foreground="#F38BA8" FontSize="12" />
+                                   FontWeight="SemiBold" Foreground="{StaticResource AccentRed}" FontSize="12" />
                         <ItemsControl ItemsSource="{Binding Warnings}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <TextBlock Text="{Binding}" Foreground="#F9E2AF" FontSize="11"
+                                    <TextBlock Text="{Binding}" Foreground="{StaticResource AccentYellow}" FontSize="11"
                                                TextWrapping="Wrap" />
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
 
-                    <Border Height="1" Background="#313244" />
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
 
                     <!-- Next-steps instructions -->
                     <StackPanel Spacing="4">
                         <TextBlock Text="{Binding [Generate_NextSteps], Source={StaticResource Loc}}"
-                                   FontWeight="SemiBold" Foreground="#CDD6F4" FontSize="12" />
+                                   FontWeight="SemiBold" Foreground="{StaticResource Text}" FontSize="12" />
                         <TextBlock Text="{Binding [Generate_NextStepsBody], Source={StaticResource Loc}}"
-                                   Foreground="#A6ADC8" FontSize="11" TextWrapping="Wrap" />
+                                   Foreground="{StaticResource TextSubtle}" FontSize="11" TextWrapping="Wrap" />
                     </StackPanel>
 
                 </StackPanel>

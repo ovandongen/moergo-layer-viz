@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MoergoLayerViz.App.Services;
 using MoergoLayerViz.Core.Layout;
 
 namespace MoergoLayerViz.App.ViewModels;
@@ -18,8 +19,8 @@ namespace MoergoLayerViz.App.ViewModels;
 /// </summary>
 public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
 {
-    private const string DefaultFill = "#F2F2F2";
-    private const string SelectedFill = "#A6E3A1"; // Catppuccin green — distinct from layer palette pastels.
+    private const string DefaultFill = AppTheme.KeyDefaultFillHex;
+    private const string SelectedFill = AppTheme.AccentGreenHex;
 
     private readonly IKeyboardProfile _profile;
     private int? _selectedIndex;
@@ -82,8 +83,8 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
 
     // Press dots aren't pulsed in the picker (IsPressed is never set), but
     // BoardView binds these regardless so the brush parses cleanly.
-    public string PressHighlightColor => "#FFD60A";
-    public string PressHighlightStrokeColor => "#7A6803";
+    public string PressHighlightColor => AppTheme.PressHighlightDefaultHex;
+    public string PressHighlightStrokeColor => AppTheme.PickerPressStrokeHex;
 
     public Action<int>? OnKeyTapped => ToggleKey;
 
@@ -136,6 +137,11 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
     private void UpdateChips()
     {
         HasSelection = _selectedIndex is not null;
-        SelectionSummary = _selectedIndex is int i ? $"#{i}" : "";
+        SelectionSummary = _selectedIndex switch
+        {
+            int i when i >= 0 && i < _profile.Keys.Count =>
+                _profile.Keys[i].Description is { Length: > 0 } d ? $"{d} (#{i})" : $"#{i}",
+            _ => "",
+        };
     }
 }

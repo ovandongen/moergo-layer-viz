@@ -135,12 +135,10 @@ public record UserSettings
 
     /// <summary>
     /// Per-keyboard fallback target when focus moves away from any matched
-    /// app. Outer key = profile id, value = <c>"Previous"</c> (default —
-    /// restore the layer that was active when the rule-controlled session
-    /// began) or <c>"Base"</c> (always push layer 0). Missing entries
-    /// resolve to <c>"Previous"</c>.
+    /// app. Outer key = profile id, value = the fallback mode. Missing
+    /// entries resolve to <see cref="AutoSwitchFallbackMode.Base"/>.
     /// </summary>
-    public Dictionary<string, string> AutoSwitchFallback { get; init; } = new();
+    public Dictionary<string, AutoSwitchFallbackMode> AutoSwitchFallback { get; init; } = new();
 
     /// <summary>
     /// Per-keyboard "escape hatch" key for the auto-switch engine: a single

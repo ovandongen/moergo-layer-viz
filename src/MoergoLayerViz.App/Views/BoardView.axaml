@@ -9,13 +9,8 @@
              x:DataType="vm:IBoardSurface">
 
     <UserControl.Resources>
-        <!-- Palette tuned to the earlier xaml.io sketch. -->
-        <SolidColorBrush x:Key="KeyFill" Color="#F2F2F2" />
-        <SolidColorBrush x:Key="KeyStroke" Color="#B0B0B0" />
-        <SolidColorBrush x:Key="LayerKeyFill" Color="#1F8B4C" />
-        <SolidColorBrush x:Key="UntrackableKeyFill" Color="#E64980" />
-        <SolidColorBrush x:Key="KeyLabel" Color="#1E1E2E" />
-        <SolidColorBrush x:Key="LayerKeyLabel" Color="#F2F2F2" />
+        <!-- All brushes (KeyStroke, KeyUntrackableStroke, ComboFill, ComboStroke)
+             live in App.axaml — keep this dictionary template-only. -->
 
         <!-- Single key template, shared between the two per-hand ItemsControls
              below so we don't have to keep two copies in sync. -->
@@ -31,7 +26,7 @@
                 <Grid.RenderTransformOrigin>0.5,0.5</Grid.RenderTransformOrigin>
 
                 <!-- Key fill: driven by KeyFillColor (precedence: decoration.background
-                     > target-layer palette color > default #F2F2F2). -->
+                     > target-layer palette color > default KeyDefaultFill). -->
                 <Rectangle RadiusX="6" RadiusY="6"
                            Stroke="{StaticResource KeyStroke}"
                            StrokeThickness="1"
@@ -66,13 +61,13 @@
                       VerticalAlignment="Bottom"
                       IsHitTestVisible="False"
                       IsVisible="{Binding IsInCombo}"
-                      Fill="#4DABF7"
-                      Stroke="#1971C2"
+                      Fill="{StaticResource ComboFill}"
+                      Stroke="{StaticResource ComboStroke}"
                       StrokeThickness="1" />
 
                 <!-- Untrackable-layer warning: pink border over the base fill -->
                 <Rectangle RadiusX="6" RadiusY="6"
-                           Stroke="{StaticResource UntrackableKeyFill}"
+                           Stroke="{StaticResource KeyUntrackableStroke}"
                            StrokeThickness="2"
                            Fill="Transparent"
                            IsVisible="{Binding IsUntrackableLayerSwitch}" />

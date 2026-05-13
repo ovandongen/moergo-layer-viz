@@ -11,6 +11,54 @@
 
     <Application.Resources>
         <loc:Loc x:Key="Loc" />
+
+        <!-- App-wide color palette. Mirror of MoergoLayerViz.App.Services.AppTheme;
+             keep both in sync. Rule of thumb: any literal #RRGGBB in a view file
+             is a bug — add it here (and in AppTheme) and reference via
+             {StaticResource <name>} instead. -->
+
+        <!-- Backgrounds -->
+        <SolidColorBrush x:Key="BgCrust" Color="#181825" />
+        <SolidColorBrush x:Key="BgBase" Color="#1E1E2E" />
+        <SolidColorBrush x:Key="BgSurface0" Color="#313244" />
+        <SolidColorBrush x:Key="BgSurface1" Color="#45475A" />
+
+        <!-- Text -->
+        <SolidColorBrush x:Key="Text" Color="#CDD6F4" />
+        <SolidColorBrush x:Key="TextSubtle" Color="#A6ADC8" />
+        <SolidColorBrush x:Key="TextMuted" Color="#6C7086" />
+        <SolidColorBrush x:Key="TextStatusBar" Color="#8A8AA0" />
+        <SolidColorBrush x:Key="TextAccessibilityBody" Color="#D0D0D8" />
+
+        <!-- Accents -->
+        <SolidColorBrush x:Key="AccentBlue" Color="#89B4FA" />
+        <SolidColorBrush x:Key="AccentGreen" Color="#A6E3A1" />
+        <SolidColorBrush x:Key="AccentTeal" Color="#94E2D5" />
+        <SolidColorBrush x:Key="AccentYellow" Color="#F9E2AF" />
+        <SolidColorBrush x:Key="AccentRed" Color="#F38BA8" />
+
+        <!-- Tab chrome -->
+        <SolidColorBrush x:Key="TabBg" Color="#363649" />
+        <SolidColorBrush x:Key="TabBorder" Color="#4A4A63" />
+        <SolidColorBrush x:Key="TabHoverBg" Color="#3E3E5C" />
+        <SolidColorBrush x:Key="TabHoverBorder" Color="#6A6A88" />
+        <SolidColorBrush x:Key="TabSelectedBg" Color="#46466A" />
+        <SolidColorBrush x:Key="TabSelectedBorder" Color="#7A7A9A" />
+
+        <!-- Key board -->
+        <SolidColorBrush x:Key="KeyDefaultFill" Color="#F2F2F2" />
+        <SolidColorBrush x:Key="KeyStroke" Color="#B0B0B0" />
+        <SolidColorBrush x:Key="KeyLayerFill" Color="#1F8B4C" />
+        <SolidColorBrush x:Key="KeyUntrackableStroke" Color="#E64980" />
+
+        <!-- Combo indicator -->
+        <SolidColorBrush x:Key="ComboFill" Color="#4DABF7" />
+        <SolidColorBrush x:Key="ComboStroke" Color="#1971C2" />
+
+        <!-- Error toast -->
+        <SolidColorBrush x:Key="ErrorBg" Color="#E03131" />
+        <SolidColorBrush x:Key="ErrorBorder" Color="#A51F1F" />
+        <SolidColorBrush x:Key="ErrorText" Color="#FFFFFF" />
     </Application.Resources>
 
     <!-- System tray icon (NativeMenuItem doesn't support binding — localized in code-behind) -->

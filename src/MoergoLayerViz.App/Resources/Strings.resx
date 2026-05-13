@@ -162,6 +162,9 @@
   <data name="Settings_AutoSwitch_PickProcessFilter"><value>Filter…</value></data>
   <data name="Settings_AutoSwitch_LayerFormat"><value>{0} (L:{1})</value></data>
   <data name="Settings_AutoSwitch_LayerInvalid"><value>(invalid layer)</value></data>
+  <data name="Settings_AutoSwitch_SectionEngine"><value>Engine</value></data>
+  <data name="Settings_AutoSwitch_SectionExitKey"><value>Exit key</value></data>
+  <data name="Settings_AutoSwitch_SectionRules"><value>Rules</value></data>
   <data name="Settings_LayersFormat"><value>Layers — {0}</value></data>
   <data name="Settings_LayersHint"><value>Customize each layer's color and signal key. Layers with an auto-detected signal macro show the keycode read-only; the rest get a manual F-key picker so live tracking can follow them.</value></data>
   <data name="Settings_LayerColorsReset"><value>Reset</value></data>

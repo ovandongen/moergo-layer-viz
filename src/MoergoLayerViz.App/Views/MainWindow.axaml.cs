@@ -4,6 +4,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.VisualTree;
+using MoergoLayerViz.App.Services;
 using MoergoLayerViz.Core.Diagnostics;
 
 namespace MoergoLayerViz.App.Views;
@@ -43,7 +44,7 @@ public partial class MainWindow : Window
         {
             // Platform explicitly says no transparency — use solid background with system chrome.
             DiagnosticLog.Warn("UI", "Transparency: fallback to solid background + system decorations");
-            Background = Avalonia.Media.SolidColorBrush.Parse("#1E1E2E");
+            Background = Avalonia.Media.SolidColorBrush.Parse(AppTheme.BgBaseHex);
             SystemDecorations = SystemDecorations.Full;
             ExtendClientAreaToDecorationsHint = false;
             return;

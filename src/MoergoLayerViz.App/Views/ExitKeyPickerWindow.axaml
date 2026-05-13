@@ -14,20 +14,20 @@
 
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,12" Spacing="6">
             <TextBlock Text="{Binding [Settings_AutoSwitch_PickExitKeysHint], Source={StaticResource Loc}}"
-                       Foreground="#CDD6F4" FontSize="12" TextWrapping="Wrap" />
+                       Foreground="{StaticResource Text}" FontSize="12" TextWrapping="Wrap" />
             <TextBlock Text="{Binding [Settings_AutoSwitch_PickExitKeysCandidates], Source={StaticResource Loc}}"
-                       Foreground="#A6ADC8" FontSize="12" TextWrapping="Wrap" FontStyle="Italic" />
+                       Foreground="{StaticResource TextSubtle}" FontSize="12" TextWrapping="Wrap" FontStyle="Italic" />
         </StackPanel>
 
         <Grid DockPanel.Dock="Bottom" ColumnDefinitions="Auto,*,Auto,Auto,Auto" Margin="0,12,0,0">
             <TextBlock Grid.Column="0"
                        Text="{Binding [Settings_AutoSwitch_PickExitKeysSelection], Source={StaticResource Loc}}"
-                       Foreground="#A6ADC8" FontSize="12"
+                       Foreground="{StaticResource TextSubtle}" FontSize="12"
                        VerticalAlignment="Center"
                        Margin="0,0,8,0" />
             <TextBlock Grid.Column="1"
                        Text="{Binding SelectionSummary}"
-                       Foreground="#A6E3A1" FontSize="12" FontWeight="SemiBold"
+                       Foreground="{StaticResource AccentGreen}" FontSize="12" FontWeight="SemiBold"
                        VerticalAlignment="Center" />
             <Button Grid.Column="2" Margin="8,0,0,0"
                     Content="{Binding [Settings_AutoSwitch_ClearExitKeys], Source={StaticResource Loc}}"
@@ -44,8 +44,8 @@
                     Classes="accent" />
         </Grid>
 
-        <Border BorderBrush="#313244" BorderThickness="1" CornerRadius="6"
-                Background="#1E1E2E" Padding="12">
+        <Border BorderBrush="{StaticResource BgSurface0}" BorderThickness="1" CornerRadius="6"
+                Background="{StaticResource BgBase}" Padding="12">
             <views:BoardView />
         </Border>
 

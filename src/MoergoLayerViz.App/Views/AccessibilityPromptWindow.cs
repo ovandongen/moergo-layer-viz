@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using MoergoLayerViz.App.Localization;
+using MoergoLayerViz.App.Services;
 using MoergoLayerViz.Core.Diagnostics;
 
 namespace MoergoLayerViz.App.Views;
@@ -22,14 +23,14 @@ public sealed class AccessibilityPromptWindow : Window
         Height = 220;
         CanResize = false;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
-        Background = new SolidColorBrush(Color.Parse("#1E1E2E"));
+        Background = new SolidColorBrush(Color.Parse(AppTheme.BgBaseHex));
 
         var title = new TextBlock
         {
             Text = Loc.Instance["Accessibility_Title"],
             FontSize = 16,
             FontWeight = FontWeight.SemiBold,
-            Foreground = new SolidColorBrush(Color.Parse("#F2F2F2")),
+            Foreground = new SolidColorBrush(Color.Parse(AppTheme.KeyDefaultFillHex)),
             Margin = new Thickness(0, 0, 0, 12),
         };
 
@@ -37,7 +38,7 @@ public sealed class AccessibilityPromptWindow : Window
         {
             Text = Loc.Instance["Accessibility_Body"],
             TextWrapping = TextWrapping.Wrap,
-            Foreground = new SolidColorBrush(Color.Parse("#D0D0D8")),
+            Foreground = new SolidColorBrush(Color.Parse(AppTheme.TextAccessibilityBodyHex)),
             Margin = new Thickness(0, 0, 0, 20),
         };
 

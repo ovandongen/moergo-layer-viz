@@ -11,17 +11,30 @@ public partial class SettingsWindow : Window
     public SettingsWindow()
     {
         InitializeComponent();
-        // Refresh the running-process list when the picker button is clicked,
-        // just before the flyout opens. Button.Click fires synchronously
-        // before Flyout.Open, so the bound ListBox shows fresh data.
-        if (this.FindControl<Button>("PickProcessButton") is { } btn)
-        {
-            btn.Click += (_, _) =>
-            {
-                if (DataContext is SettingsViewModel vm)
-                    vm.RefreshRunningProcesses();
-            };
-        }
+    }
+
+    /// <summary>
+    /// Apply-on-close for the app-layer rule edit buffer. The settings VM
+    /// owns the editable copy; only on close do we push it back into the main
+    /// VM, which persists and re-fires the engine. Catches all exit paths
+    /// (X button, Esc, alt-F4) since they all funnel through OnClosing.
+    /// </summary>
+    protected override void OnClosing(WindowClosingEventArgs e)
+    {
+        base.OnClosing(e);
+        if (DataContext is SettingsViewModel vm)
+            vm.CommitAppLayerRules();
+    }
+
+    /// <summary>
+    /// Refreshes the running-process snapshot right before the picker
+    /// flyout opens so the bound ListBox shows fresh data. Wired in XAML
+    /// via <c>Flyout.Opening</c>.
+    /// </summary>
+    private void OnPickProcessFlyoutOpening(object? sender, System.EventArgs e)
+    {
+        if (DataContext is SettingsViewModel vm)
+            vm.RefreshRunningProcesses();
     }
 
     // TextBlock has no built-in click command, so the update-link's
