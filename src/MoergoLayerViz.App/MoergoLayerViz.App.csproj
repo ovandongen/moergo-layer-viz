@@ -2,12 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <!-- Windows TFM is added on Windows hosts only so the WinRT BLE GATT path
-         (WindowsBleRawHidLayerSource) compiles. macOS/Linux dev builds stay
-         on the portable net10.0 leg; CI's win-x64 publish picks the windows
-         flavour automatically. -->
-    <TargetFrameworks>net10.0</TargetFrameworks>
-    <TargetFrameworks Condition="$([MSBuild]::IsOSPlatform('Windows'))">net10.0;net10.0-windows10.0.19041.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <RootNamespace>MoergoLayerViz.App</RootNamespace>
@@ -53,6 +48,47 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="MoergoLayerViz.Tests" />
+  </ItemGroup>
+
+  <!--
+    Vendor the native hidapi binaries next to the executable per RID.
+    HidApi.Net is just bindings; it needs the host to provide libhidapi.
+    Copying to output root (not runtimes/<rid>/native/) is intentional —
+    the .NET native-library loader searches the exe's directory, which
+    works for both `dotnet run` and self-contained publish. The Condition
+    handles `dotnet run` (no explicit RID) by inferring from the host OS
+    so dev builds pick up the dylib without -r osx-arm64.
+  -->
+  <PropertyGroup>
+    <_HidapiHostRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_HidapiHostRid>
+    <_HidapiHostRid Condition="'$(_HidapiHostRid)' == '' AND $([MSBuild]::IsOSPlatform('OSX')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'Arm64'">osx-arm64</_HidapiHostRid>
+    <_HidapiHostRid Condition="'$(_HidapiHostRid)' == '' AND $([MSBuild]::IsOSPlatform('OSX')) AND '$([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture)' == 'X64'">osx-x64</_HidapiHostRid>
+    <_HidapiHostRid Condition="'$(_HidapiHostRid)' == '' AND $([MSBuild]::IsOSPlatform('Windows'))">win-x64</_HidapiHostRid>
+    <_HidapiHostRid Condition="'$(_HidapiHostRid)' == '' AND $([MSBuild]::IsOSPlatform('Linux'))">linux-x64</_HidapiHostRid>
+    <_HidapiRoot>$(MSBuildThisFileDirectory)..\..\external\hidapi-binaries\runtimes\</_HidapiRoot>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="$(_HidapiRoot)osx-arm64\native\libhidapi.dylib" Condition="'$(_HidapiHostRid)' == 'osx-arm64' AND Exists('$(_HidapiRoot)osx-arm64\native\libhidapi.dylib')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>libhidapi.dylib</Link>
+      <Visible>false</Visible>
+    </None>
+    <None Include="$(_HidapiRoot)osx-x64\native\libhidapi.dylib" Condition="'$(_HidapiHostRid)' == 'osx-x64' AND Exists('$(_HidapiRoot)osx-x64\native\libhidapi.dylib')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>libhidapi.dylib</Link>
+      <Visible>false</Visible>
+    </None>
+    <None Include="$(_HidapiRoot)win-x64\native\hidapi.dll" Condition="'$(_HidapiHostRid)' == 'win-x64' AND Exists('$(_HidapiRoot)win-x64\native\hidapi.dll')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>hidapi.dll</Link>
+      <Visible>false</Visible>
+    </None>
+    <None Include="$(_HidapiRoot)linux-x64\native\libhidapi.so" Condition="'$(_HidapiHostRid)' == 'linux-x64' AND Exists('$(_HidapiRoot)linux-x64\native\libhidapi.so')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Link>libhidapi.so</Link>
+      <Visible>false</Visible>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -1051,8 +1051,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // so it spins up regardless of the SharpHook outcome above. The
         // matcher scopes discovery to the user's selected keyboard (both
         // Moergo boards share VID:PID, so we'd otherwise latch onto whichever
-        // is enumerated first). Per-OS transport selection (IOKit / hidraw /
-        // HidSharp+WinRT GATT) lives inside ZmkHidProtocol's LayerSourceFactory.
+        // is enumerated first). The unified HidApi.Net transport handles
+        // Windows/macOS/Linux and USB/BLE in one code path; see
+        // ZmkHidProtocol's RawHidLayerSource.
         var (hidSource, hidSink) = LayerSourceFactory.Create(new KeyboardProfileMatcher(_profile));
         _commandSender = new CommandSender(hidSource, hidSink);
         _layerStateTracker = new LayerStateTracker();

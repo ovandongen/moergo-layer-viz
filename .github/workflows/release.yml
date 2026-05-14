@@ -22,7 +22,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          submodules: recursive
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -43,14 +44,14 @@ jobs:
         run: |
           dotnet publish src/MoergoLayerViz.App/MoergoLayerViz.App.csproj \
             -c Release -r win-x64 --self-contained true \
-            -f net10.0-windows10.0.19041.0 \
+            -f net10.0 \
             -p:PublishSingleFile=false \
             -p:Version=${{ steps.ver.outputs.version }}
 
       - name: Package zip
         shell: pwsh
         run: |
-          $publish = "src/MoergoLayerViz.App/bin/Release/net10.0-windows10.0.19041.0/win-x64/publish"
+          $publish = "src/MoergoLayerViz.App/bin/Release/net10.0/win-x64/publish"
           $zip = "MoergoLayerViz-${{ steps.ver.outputs.version }}-windows-x64.zip"
           Compress-Archive -Path "$publish/*" -DestinationPath $zip -Force
           Get-Item $zip | Format-List Name, Length
@@ -70,7 +71,8 @@ jobs:
         rid: [osx-arm64, osx-x64]
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          submodules: recursive
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
@@ -123,7 +125,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          submodules: recursive
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
