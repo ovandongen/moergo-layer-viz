@@ -1,77 +1,71 @@
-using SharpHook;
-using SharpHook.Data;
+using MoergoLayerViz.App.Services.Hotkeys;
+using MoergoLayerViz.Core.Diagnostics;
 
 namespace MoergoLayerViz.App.Services;
 
 /// <summary>
-/// Listens for a global hotkey using SharpHook and fires a callback.
-/// Works cross-platform (Windows, macOS, Linux). On macOS, requires
-/// Accessibility permission (OS prompts automatically on first use).
+/// Owns the single show/hide global hotkey. Sits on top of
+/// <see cref="INativeHotkeyRegistry"/>, which uses native OS APIs (Carbon
+/// <c>RegisterEventHotKey</c> on macOS, User32 <c>RegisterHotKey</c> on
+/// Windows). These APIs require no Accessibility / Input-Monitoring
+/// permission on macOS — replacing the previous SharpHook-based path.
 /// </summary>
 public class GlobalHotkeyService : IDisposable
 {
-    private readonly SharpHookProvider _provider;
-    private bool _started;
+    private readonly INativeHotkeyRegistry _registry;
+    private int _token;
+    private string _keyName = "F12";
+    private string _modifiersName = "None";
 
-    public GlobalHotkeyService(SharpHookProvider provider)
+    public GlobalHotkeyService(INativeHotkeyRegistry registry)
     {
-        _provider = provider;
+        _registry = registry;
     }
 
-    /// <summary>Fired on the hook thread when the hotkey is pressed.</summary>
+    /// <summary>Fired on the Avalonia UI thread when the hotkey is pressed.</summary>
     public Action? HotkeyPressed { get; set; }
 
-    /// <summary>The key to listen for (default: F12).</summary>
-    public KeyCode Key { get; set; } = KeyCode.VcF12;
-
-    /// <summary>Required modifier mask (default: None).</summary>
-    public EventMask Modifiers { get; set; } = EventMask.None;
-
-    public void Start()
+    /// <summary>Sets the key/modifier to register. Call <see cref="Start"/> to register, or call after Start to live-rebind.</summary>
+    public void UpdateHotkey(string keyName, string modifiersName)
     {
-        if (_started) return;
-        _started = true;
-        _provider.KeyPressed += OnKeyPressed;
-        _provider.Acquire();
-    }
-
-    private void OnKeyPressed(object? sender, KeyboardHookEventArgs e)
-    {
-        if (e.Data.KeyCode == Key &&
-            (Modifiers == EventMask.None || (e.RawEvent.Mask & Modifiers) == Modifiers))
+        _keyName = keyName;
+        _modifiersName = modifiersName;
+        if (_token != 0)
         {
-            HotkeyPressed?.Invoke();
+            _registry.Unregister(_token);
+            _token = 0;
+            Register();
         }
     }
 
-    /// <summary>Updates the key/modifier to listen for.</summary>
-    public void UpdateHotkey(KeyCode key, EventMask modifiers)
+    /// <summary>Registers the configured hotkey. Idempotent.</summary>
+    public void Start()
     {
-        Key = key;
-        Modifiers = modifiers;
+        if (_token != 0) return;
+        Register();
     }
 
+    /// <summary>Releases the registration. Idempotent.</summary>
     public void Stop()
     {
-        if (!_started) return;
-        _started = false;
-        _provider.KeyPressed -= OnKeyPressed;
-        _provider.Release();
+        if (_token == 0) return;
+        _registry.Unregister(_token);
+        _token = 0;
     }
 
-    /// <summary>Parses a key name (e.g. "F12") to a SharpHook KeyCode.</summary>
-    public static KeyCode ParseKey(string name) => Enum.Parse<KeyCode>($"Vc{name}");
-
-    /// <summary>Parses a modifier name (e.g. "None", "Ctrl") to a SharpHook EventMask.</summary>
-    public static EventMask ParseModifiers(string name)
+    private void Register()
     {
-        if (string.IsNullOrEmpty(name) || name == "None")
-            return EventMask.None;
-        return Enum.Parse<EventMask>(name);
+        var result = _registry.TryRegister(_keyName, _modifiersName, () => HotkeyPressed?.Invoke());
+        if (result.Success)
+        {
+            _token = result.Token;
+            DiagnosticLog.Info("Hotkey", $"registered show/hide hotkey '{_keyName}' modifiers='{_modifiersName}'");
+        }
+        else
+        {
+            DiagnosticLog.Warn("Hotkey", $"failed to register '{_keyName}': {result.ErrorMessage}");
+        }
     }
 
-    public void Dispose()
-    {
-        Stop();
-    }
+    public void Dispose() => Stop();
 }

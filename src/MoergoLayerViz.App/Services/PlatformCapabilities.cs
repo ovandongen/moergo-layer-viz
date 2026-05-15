@@ -8,9 +8,10 @@ namespace MoergoLayerViz.App.Services;
 public static class PlatformCapabilities
 {
     /// <summary>
-    /// False on Linux — Wayland blocks process-global key hooks from
-    /// unfocused windows, so the show/hide hotkey isn't wired and its UI
-    /// is hidden. macOS and Windows host SharpHook + libuiohook fine.
+    /// False on Linux — global hotkey registration requires per-WM
+    /// cooperation (Wayland portals, X11 grabs) that we don't ship today.
+    /// macOS uses Carbon RegisterEventHotKey, Windows uses User32
+    /// RegisterHotKey.
     /// </summary>
     public static bool IsGlobalHotkeySupported { get; } = !OperatingSystem.IsLinux();
 }

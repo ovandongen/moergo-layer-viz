@@ -40,16 +40,21 @@ public record UserSettings
     /// <summary>Whether the window stays on top of other windows.</summary>
     public bool AlwaysOnTop { get; init; } = true;
 
-    /// <summary>Global hotkey key name (SharpHook KeyCode enum without "Vc" prefix, e.g. "F12").</summary>
+    /// <summary>
+    /// Show/hide global hotkey, neutral key name ("F12", "F18"). Registered
+    /// via the platform's native hotkey API (Carbon on macOS, User32 on
+    /// Windows). Inert on Linux.
+    /// </summary>
     public string HotkeyKey { get; init; } = "F12";
 
-    /// <summary>Global hotkey modifier (SharpHook EventMask name, e.g. "None", "Ctrl").</summary>
+    /// <summary>
+    /// Modifier expression for the show/hide hotkey: "None" / empty, or one
+    /// or more of "Ctrl", "Alt", "Shift", "Meta" joined with "+". Today the
+    /// UI only exposes the key picker; this is reserved for future use.
+    /// </summary>
     public string HotkeyModifiers { get; init; } = "None";
 
-    /// <summary>
-    /// Whether live key highlighting (pressed-key visualization) is enabled.
-    /// Requires Accessibility permission on macOS.
-    /// </summary>
+    /// <summary>Whether live key highlighting (pressed-key visualization) is enabled.</summary>
     public bool LiveKeyHighlighting { get; init; } = true;
 
     /// <summary>Whether to auto-switch the displayed layer when signal-macro keys are detected.</summary>
@@ -100,15 +105,6 @@ public record UserSettings
 
     /// <summary>Which half goes on top in stacked mode. "Left" or "Right".</summary>
     public string StackedTopHand { get; init; } = "Left";
-
-    /// <summary>
-    /// How to source layer state. "Auto" (default) prefers Raw HID when a
-    /// matching device is connected and falls back to SharpHook + signal
-    /// macros otherwise. "RawHid" requires a HID-enabled board and shows a
-    /// "searching" status when none is connected. "SharpHook" ignores HID
-    /// entirely and uses only the F-key signal-macro path.
-    /// </summary>
-    public string LayerSource { get; init; } = "Auto";
 
     /// <summary>
     /// Per-keyboard app→layer rules. Outer key = profile id, value = ordered

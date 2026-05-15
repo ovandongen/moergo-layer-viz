@@ -153,10 +153,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         PersistSetting(s => s with { PressHighlightColor = value });
 
     /// <summary>
-    /// Global show/hide hotkey keycode (e.g. "F12"). Modifier handling lives
-    /// in <see cref="UserSettings.HotkeyModifiers"/> and isn't user-editable
-    /// today. Changing this raises <see cref="HotkeyKeyChanged"/> so the live
-    /// <c>GlobalHotkeyService</c> rewires without restart.
+    /// Global show/hide hotkey key name (e.g. "F12"). Modifier handling
+    /// lives in <see cref="UserSettings.HotkeyModifiers"/> and isn't
+    /// user-editable today. Changing this raises <see cref="HotkeyKeyChanged"/>
+    /// so the live <see cref="Services.GlobalHotkeyService"/> rewires
+    /// without restart.
     /// </summary>
     [ObservableProperty]
     private string _hotkeyKey = "F12";
@@ -330,7 +331,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Action? ToggleWindowRequested { get; set; }
     public Func<Task>? LoadLayoutRequested { get; set; }
     public Func<Task>? CopyDiagnosticsRequested { get; set; }
-    public Action? ShowAccessibilityPromptRequested { get; set; }
     public Action? OpenSettingsRequested { get; set; }
 
     /// <summary>Path of the layout JSON the user currently has loaded, or null if none.</summary>
@@ -396,7 +396,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     public MainWindowViewModel(
         ISettingsService settingsService,
-        SharpHookProvider? hookProvider = null,
         IActiveWindowMonitor? activeWindowMonitor = null)
     {
         _settingsService = settingsService;

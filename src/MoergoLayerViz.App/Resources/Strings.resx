@@ -146,10 +146,4 @@
   <data name="Settings_UpToDate"><value>You're on the latest version.</value></data>
   <data name="Settings_UpdateAvailable"><value>Update available: {0} — click to download.</value></data>
   <data name="Settings_UpdateCheckFailed"><value>Could not check for updates.</value></data>
-
-  <!-- Accessibility permission prompt (macOS) -->
-  <data name="Accessibility_Title"><value>Accessibility permission required</value></data>
-  <data name="Accessibility_Body"><value>Moergo Layer Viz needs Accessibility permission to watch keystrokes for the global show/hide hotkey. Grant access in System Settings → Privacy &amp; Security → Accessibility, then restart the app.</value></data>
-  <data name="Accessibility_OpenSettings"><value>Open System Settings</value></data>
-  <data name="Accessibility_Dismiss"><value>Dismiss</value></data>
 </root>

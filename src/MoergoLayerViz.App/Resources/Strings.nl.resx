@@ -140,9 +140,4 @@
   <data name="Settings_UpToDate"><value>Je gebruikt de nieuwste versie.</value></data>
   <data name="Settings_UpdateAvailable"><value>Update beschikbaar: {0} — klik om te downloaden.</value></data>
   <data name="Settings_UpdateCheckFailed"><value>Kon niet controleren op updates.</value></data>
-
-  <data name="Accessibility_Title"><value>Toegankelijkheidsrechten vereist</value></data>
-  <data name="Accessibility_Body"><value>Moergo Layer Viz heeft toegankelijkheidsrechten nodig om toetsaanslagen voor de globale toon/verberg-sneltoets te volgen. Verleen toegang via Systeeminstellingen → Privacy &amp; Beveiliging → Toegankelijkheid en herstart de app.</value></data>
-  <data name="Accessibility_OpenSettings"><value>Systeeminstellingen openen</value></data>
-  <data name="Accessibility_Dismiss"><value>Sluiten</value></data>
 </root>

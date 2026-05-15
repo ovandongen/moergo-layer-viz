@@ -7,17 +7,10 @@ namespace MoergoLayerViz.App.Services;
 
 /// <summary>
 /// Wraps the HID <see cref="ILayerSource"/> and forwards its layer / key-position
-/// events. After the macro-signal subsystem was removed, HID is the only source.
+/// events. HID is the only layer source.
 /// </summary>
 public sealed class LayerSourceCoordinator : IDisposable
 {
-    // Retained for settings-file backwards compatibility; only RawHid is
-    // honored at runtime. Phase 2 of the refactor removes the mode concept
-    // entirely.
-    public const string ModeAuto = "Auto";
-    public const string ModeRawHid = "RawHid";
-    public const string ModeSharpHook = "SharpHook";
-
     private readonly ILayerSource? _hid;
     private bool _started;
 

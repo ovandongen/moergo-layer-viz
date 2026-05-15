@@ -8,6 +8,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using MoergoLayerViz.App.Localization;
 using MoergoLayerViz.App.Services;
+using MoergoLayerViz.App.Services.Hotkeys;
 using MoergoLayerViz.App.ViewModels;
 using MoergoLayerViz.App.Views;
 using MoergoLayerViz.Core.Diagnostics;
@@ -58,15 +59,11 @@ public partial class App : Application
             else if (Enum.TryParse<LogLevel>(initialSettings.LogLevel, true, out var logLevel))
                 DiagnosticLog.SetMinimumLevel(logLevel);
 
-            // Shared global-hook owner — libuiohook is a process-global
-            // singleton, so both GlobalHotkeyService and the live key-event
-            // source have to drive the same underlying hook.
-            SharpHookProvider? hookProvider = null;
-            if (!OperatingSystem.IsLinux())
-            {
-                hookProvider = new SharpHookProvider();
-                desktop.Exit += (_, _) => hookProvider.Dispose();
-            }
+            // Native global-hotkey registry (Carbon on macOS, User32 on
+            // Windows, no-op on Linux). Replaces the previous SharpHook/
+            // libuiohook-based hook — no Accessibility prompt on macOS.
+            var hotkeyRegistry = NativeHotkeyRegistryFactory.Create();
+            desktop.Exit += (_, _) => hotkeyRegistry.Dispose();
 
             // Construct only — MainWindowViewModel calls Start/Stop on demand
             // based on the master toggle and rule-list state. App owns disposal.
@@ -82,7 +79,7 @@ public partial class App : Application
             }
 
             DiagnosticLog.Info("Startup", "Creating MainWindowViewModel...");
-            var viewModel = new MainWindowViewModel(settingsService, hookProvider, activeWindowMonitor);
+            var viewModel = new MainWindowViewModel(settingsService, activeWindowMonitor);
             var mainWindow = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = mainWindow;
 
@@ -201,15 +198,6 @@ public partial class App : Application
                     viewModel.LoadLayoutFromPath(file[0].Path.LocalPath);
             };
 
-            viewModel.ShowAccessibilityPromptRequested = () =>
-            {
-                var dialog = new Views.AccessibilityPromptWindow();
-                if (mainWindow.IsVisible)
-                    dialog.ShowDialog(mainWindow);
-                else
-                    dialog.Show();
-            };
-
             // Single non-modal Settings window. Re-clicking the toolbar button
             // brings the existing window to front rather than spawning a new one.
             SettingsWindow? settingsWindow = null;
@@ -262,37 +250,16 @@ public partial class App : Application
                 }
             };
 
-            // Global show/hide hotkey — Linux/Wayland blocks global hooks from unfocused windows.
-            if (!OperatingSystem.IsLinux() && hookProvider is not null)
-            {
-                _hotkeyService = new GlobalHotkeyService(hookProvider);
-                try
-                {
-                    _hotkeyService.Key = GlobalHotkeyService.ParseKey(initialSettings.HotkeyKey);
-                    _hotkeyService.Modifiers = GlobalHotkeyService.ParseModifiers(initialSettings.HotkeyModifiers);
-                }
-                catch
-                {
-                    // Invalid saved hotkey — use defaults
-                }
-                _hotkeyService.HotkeyPressed = () =>
-                    Dispatcher.UIThread.Post(() => viewModel.ToggleWindowRequested?.Invoke());
-                _hotkeyService.Start();
-                viewModel.HotkeyKeyChanged += newKey =>
-                {
-                    try
-                    {
-                        _hotkeyService.UpdateHotkey(
-                            GlobalHotkeyService.ParseKey(newKey),
-                            GlobalHotkeyService.ParseModifiers(viewModel.HotkeyModifiers));
-                    }
-                    catch (Exception ex)
-                    {
-                        DiagnosticLog.Warn("Hotkey", $"Failed to apply new hotkey '{newKey}': {ex.Message}");
-                    }
-                };
-                desktop.Exit += (_, _) => _hotkeyService.Dispose();
-            }
+            // Global show/hide hotkey. The registry's Linux stub returns
+            // failure on TryRegister, so the service no-ops on Linux without
+            // a special case here.
+            _hotkeyService = new GlobalHotkeyService(hotkeyRegistry);
+            _hotkeyService.HotkeyPressed = () => viewModel.ToggleWindowRequested?.Invoke();
+            _hotkeyService.UpdateHotkey(initialSettings.HotkeyKey, initialSettings.HotkeyModifiers);
+            _hotkeyService.Start();
+            viewModel.HotkeyKeyChanged += newKey =>
+                _hotkeyService.UpdateHotkey(newKey, viewModel.HotkeyModifiers);
+            desktop.Exit += (_, _) => _hotkeyService.Dispose();
 
             // Restore the last-loaded layout (or show a "pick a file" prompt).
             Dispatcher.UIThread.Post(() => viewModel.InitializeAsync(), DispatcherPriority.Background);
