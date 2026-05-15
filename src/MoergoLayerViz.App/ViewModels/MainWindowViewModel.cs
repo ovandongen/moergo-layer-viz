@@ -88,10 +88,36 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private const int ToastDurationMs = 4000;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ActiveLayerTintColor))]
+    [NotifyPropertyChangedFor(nameof(EffectiveLayerIndex))]
     private int _activeLayerIndex;
 
     /// <summary>Palette color for the active layer — used as the press-highlight pulse fill.</summary>
     public string ActiveLayerTintColor => LayerColorPalette.GetColor(_profile.Id, ActiveLayerIndex);
+
+    // Last layer reported by HID (or 0 when disconnected). Decoupled from
+    // ActiveLayerIndex so a "layer view" hotkey override can hold the
+    // displayed layer while HID still reports transitions in the background.
+    private int _hidReportedLayerIndex;
+
+    // When non-null, the "layer view" override pins the displayed layer
+    // regardless of HID. Set by Phase 3 hotkey bindings; cleared on a
+    // second tap of the same hotkey, or on profile change.
+    private int? _layerViewOverride;
+
+    /// <summary>
+    /// What the BoardView should be rendering: the hotkey override if set,
+    /// otherwise the HID-reported layer. Equal to <see cref="ActiveLayerIndex"/>
+    /// after every <c>ApplyActiveLayer</c>; the two diverge only during the
+    /// transient window between a HID report and the override decision.
+    /// </summary>
+    public int EffectiveLayerIndex => _layerViewOverride ?? _hidReportedLayerIndex;
+
+    /// <summary>
+    /// Current "layer view" override, or null when the display is following
+    /// the underlying HID source. Exposed read-only — toggled via
+    /// <c>ToggleLayerViewOverride</c>.
+    /// </summary>
+    public int? LayerViewOverride => _layerViewOverride;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(BoardBackground))]
@@ -169,6 +195,54 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     }
 
     public event Action<string>? HotkeyKeyChanged;
+
+    /// <summary>
+    /// Raised when the set of "layer view" hotkey bindings for the active
+    /// profile may have changed — on profile switch and after Settings
+    /// persists an edit. The host (App) reacts by re-applying bindings to
+    /// the <see cref="Services.HotkeyLayerViewService"/>.
+    /// </summary>
+    public event Action? LayerViewHotkeysChanged;
+
+    /// <summary>
+    /// Returns the persisted layer-view hotkey bindings for the currently
+    /// active keyboard profile (empty list when none are configured).
+    /// </summary>
+    public IReadOnlyList<HotkeyLayerBinding> GetActiveLayerViewBindings()
+    {
+        var s = _settingsService.Load();
+        return s.LayerViewHotkeys.TryGetValue(_profile.Id, out var list)
+            ? list
+            : Array.Empty<HotkeyLayerBinding>();
+    }
+
+    /// <summary>
+    /// Tells the host that <see cref="UserSettings.LayerViewHotkeys"/> for
+    /// the active profile has been edited and the registry should re-bind.
+    /// Called by the Settings VM after persisting an edit.
+    /// </summary>
+    public void NotifyLayerViewHotkeysChanged() => LayerViewHotkeysChanged?.Invoke();
+
+    private IReadOnlyList<HotkeyLayerViewBindingResult> _layerViewHotkeyResults = Array.Empty<HotkeyLayerViewBindingResult>();
+
+    /// <summary>
+    /// Per-binding outcome of the most recent <c>HotkeyLayerViewService.ApplyBindings</c>
+    /// call. Settings UI reads it to surface inline conflict warnings (key
+    /// already owned by another app, unsupported name). Updated by App
+    /// every time bindings are re-applied.
+    /// </summary>
+    public IReadOnlyList<HotkeyLayerViewBindingResult> LayerViewHotkeyResults => _layerViewHotkeyResults;
+
+    /// <summary>
+    /// Host hook: pushes the latest results back into the VM so the Settings
+    /// UI can read them via <see cref="LayerViewHotkeyResults"/>. Raises
+    /// <see cref="PropertyChanged"/> so subscribers refresh.
+    /// </summary>
+    public void SetLayerViewHotkeyResults(IReadOnlyList<HotkeyLayerViewBindingResult> results)
+    {
+        _layerViewHotkeyResults = results;
+        OnPropertyChanged(nameof(LayerViewHotkeyResults));
+    }
 
     /// <summary>Read-through to the persisted modifier name. Not user-editable today; keeps the hotkey-rewire call site in App self-contained.</summary>
     public string HotkeyModifiers => _settingsService.Load().HotkeyModifiers;
@@ -722,6 +796,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         SelectedKeyboard = profile;
         BuildKeysFromProfile();
         _autoSwitch.SetActiveProfile(profile);
+        // A layer-view override pinned to layer N on the old profile would
+        // index into a different layer (or no layer) on the new one —
+        // always clear it on profile change rather than re-map.
+        ClearLayerViewOverride();
 
         var layoutFits = _config is not null
             && _config.LayerCount > 0
@@ -756,6 +834,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // reports into a Glove80 layout (or vice versa). No-op when HID is
         // disabled or the source isn't running.
         _layerCoordinator?.SetActiveProfile(profile);
+
+        // Profile-scoped bindings: the host re-registers the new profile's
+        // layer-view hotkeys (or an empty set) via this event.
+        LayerViewHotkeysChanged?.Invoke();
 
         // Auto-load whichever JSON the user last associated with this keyboard.
         // If the previously-loaded layout already fits, leave it alone.
@@ -970,7 +1052,51 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private void OnActiveLayerChanged(int layer)
     {
         if (!IsAutoLayerSwitchEnabled) return;
-        Avalonia.Threading.Dispatcher.UIThread.Post(() => ApplyActiveLayer(layer));
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _hidReportedLayerIndex = layer;
+            OnPropertyChanged(nameof(EffectiveLayerIndex));
+            // An active override pins the displayed layer; HID transitions
+            // still update _hidReportedLayerIndex so clearing the override
+            // (Phase 3 toggle / profile change) reverts to the right value.
+            if (_layerViewOverride is null)
+                ApplyActiveLayer(layer);
+        });
+    }
+
+    /// <summary>
+    /// Tap-to-toggle entry point for "layer view" hotkeys (Phase 3). Pressing
+    /// a bound hotkey that maps to <paramref name="layer"/> pins the overlay
+    /// to that layer; pressing it again — same <paramref name="layer"/> —
+    /// clears the override and the overlay reverts to the HID-reported
+    /// layer (or 0 when HID is disconnected). Pressing a different bound
+    /// hotkey switches the override to its layer without an intermediate
+    /// revert. Marshals to the UI thread for callers from native hotkey
+    /// callbacks (which arrive on the registry's dispatch thread).
+    /// </summary>
+    public void ToggleLayerViewOverride(int layer)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            _layerViewOverride = _layerViewOverride == layer ? null : layer;
+            OnPropertyChanged(nameof(LayerViewOverride));
+            OnPropertyChanged(nameof(EffectiveLayerIndex));
+            // Render the new effective layer. _config may be null (no layout
+            // loaded yet) — ApplyActiveLayer short-circuits in that case.
+            ApplyActiveLayer(EffectiveLayerIndex);
+            DiagnosticLog.Info("LayerView",
+                _layerViewOverride is { } v
+                    ? $"override → layer {v}"
+                    : $"override cleared (reverting to HID layer {_hidReportedLayerIndex})");
+        });
+    }
+
+    private void ClearLayerViewOverride()
+    {
+        if (_layerViewOverride is null) return;
+        _layerViewOverride = null;
+        OnPropertyChanged(nameof(LayerViewOverride));
+        OnPropertyChanged(nameof(EffectiveLayerIndex));
     }
 
     private void OnActiveSourceChanged()

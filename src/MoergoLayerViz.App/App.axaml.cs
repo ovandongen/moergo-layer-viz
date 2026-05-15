@@ -261,6 +261,23 @@ public partial class App : Application
                 _hotkeyService.UpdateHotkey(newKey, viewModel.HotkeyModifiers);
             desktop.Exit += (_, _) => _hotkeyService.Dispose();
 
+            // Per-profile "layer view" hotkeys. The service swaps registrations
+            // on profile change and after Settings persists an edit; press
+            // events route through ToggleLayerViewOverride (tap-to-toggle).
+            // Per-binding outcomes are pushed back to the VM so the Settings
+            // UI can show inline conflict warnings.
+            var layerViewService = new HotkeyLayerViewService(
+                hotkeyRegistry,
+                viewModel.ToggleLayerViewOverride);
+            void RebindLayerView()
+            {
+                var results = layerViewService.ApplyBindings(viewModel.GetActiveLayerViewBindings());
+                viewModel.SetLayerViewHotkeyResults(results);
+            }
+            RebindLayerView();
+            viewModel.LayerViewHotkeysChanged += RebindLayerView;
+            desktop.Exit += (_, _) => layerViewService.Dispose();
+
             // Restore the last-loaded layout (or show a "pick a file" prompt).
             Dispatcher.UIThread.Post(() => viewModel.InitializeAsync(), DispatcherPriority.Background);
 

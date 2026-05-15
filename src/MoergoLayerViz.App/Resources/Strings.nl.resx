@@ -96,6 +96,14 @@
   <data name="Settings_Tab_General"><value>Algemeen</value></data>
   <data name="Settings_Tab_Layers"><value>Lagen</value></data>
   <data name="Settings_Tab_AutoSwitch"><value>Auto-wissel</value></data>
+  <data name="Settings_Tab_LayerHotkeys"><value>Laag-sneltoetsen</value></data>
+  <data name="Settings_LayerHotkeys_Title"><value>Sneltoets → laagweergave</value></data>
+  <data name="Settings_LayerHotkeys_Hint"><value>Koppel een globale sneltoets aan een laag. Druk op de sneltoets om die laag op het scherm te tonen; druk nogmaals om terug te keren naar de laag die het toetsenbord meldt. Werkt ook zonder dat het toetsenbord is aangesloten.</value></data>
+  <data name="Settings_LayerHotkeys_KeyColumn"><value>Toets</value></data>
+  <data name="Settings_LayerHotkeys_LayerColumn"><value>Laag</value></data>
+  <data name="Settings_LayerHotkeys_Add"><value>Koppeling toevoegen</value></data>
+  <data name="Settings_LayerHotkeys_Remove"><value>Verwijderen</value></data>
+  <data name="Settings_LayerHotkeys_Empty"><value>Nog geen koppelingen. Voeg er hierboven een toe.</value></data>
   <data name="Settings_AutoSwitch_Header"><value>App → laag-regels</value></data>
   <data name="Settings_AutoSwitch_Hint"><value>Regels worden in volgorde gecontroleerd; de eerste waarvan de zoekterm hoofdletterongevoelig voorkomt in de procesnaam van de actieve app wint. Wijzigingen worden direct opgeslagen. Indien ingeschakeld wordt bij elke focuswissel de bijbehorende laag naar het toetsenbord gestuurd.</value></data>
   <data name="Settings_AutoSwitch_Enable"><value>Automatisch schakelen inschakelen (gekoppelde laag naar toetsenbord bij focuswissel)</value></data>

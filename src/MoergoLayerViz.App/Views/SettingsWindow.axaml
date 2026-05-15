@@ -365,6 +365,94 @@
             </ScrollViewer>
         </TabItem>
 
+        <!-- Layer hotkeys tab: per-keyboard mapping from global hotkey to layer
+             index. Pressing a bound hotkey overlays its layer; pressing it
+             again reverts to the underlying display. Works without HID
+             (display-only override), so it's always visible — distinct from
+             the Auto-switch tab which is HID-gated. Hidden on Linux until
+             we ship Wayland portal / X11 grab support. -->
+        <TabItem Header="{Binding [Settings_Tab_LayerHotkeys], Source={StaticResource Loc}}"
+                 IsVisible="{Binding IsGlobalHotkeySupported}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <StackPanel Margin="20" Spacing="12">
+
+                    <TextBlock Text="{Binding [Settings_LayerHotkeys_Title], Source={StaticResource Loc}}"
+                               FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                    <TextBlock Text="{Binding [Settings_LayerHotkeys_Hint], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+
+                    <!-- New binding row: key picker + layer dropdown + add button. -->
+                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,4,0,0">
+                        <ComboBox Grid.Column="0" MinWidth="80"
+                                  ItemsSource="{Binding LayerHotkeyKeyChoices}"
+                                  SelectedItem="{Binding NewLayerHotkeyKey, Mode=TwoWay}"
+                                  PlaceholderText="{Binding [Settings_LayerHotkeys_KeyColumn], Source={StaticResource Loc}}" />
+                        <ComboBox Grid.Column="1" Margin="8,0,0,0" MinWidth="160"
+                                  ItemsSource="{Binding MainViewModel.Layers}"
+                                  SelectedItem="{Binding NewLayerHotkeyLayer, Mode=TwoWay}"
+                                  PlaceholderText="{Binding [Settings_LayerHotkeys_LayerColumn], Source={StaticResource Loc}}">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LayerViewModel">
+                                    <TextBlock Text="{Binding DisplayName}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Grid.Column="2" Margin="8,0,0,0"
+                                Content="{Binding [Settings_LayerHotkeys_Add], Source={StaticResource Loc}}"
+                                Command="{Binding AddLayerViewHotkeyCommand}" />
+                    </Grid>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" Margin="0,4" />
+
+                    <!-- Empty-state hint -->
+                    <TextBlock Text="{Binding [Settings_LayerHotkeys_Empty], Source={StaticResource Loc}}"
+                               Foreground="{StaticResource TextMuted}" FontSize="11" FontStyle="Italic"
+                               IsVisible="{Binding HasNoEditingLayerViewHotkeys}" />
+
+                    <!-- Existing bindings. Each row's DataContext is a
+                         LayerViewHotkeyRow (binding + error message). The
+                         remove command lives on the SettingsViewModel; we
+                         reach it via ElementName binding because the
+                         (vm:T)DataContext cast pattern is unreliable inside
+                         deferred templates (see CLAUDE.md). -->
+                    <ItemsControl ItemsSource="{Binding EditingLayerViewHotkeys}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LayerViewHotkeyRow">
+                                <StackPanel Spacing="2" Margin="0,3,0,3">
+                                    <Grid ColumnDefinitions="100,200,Auto">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding Binding.KeyName}"
+                                                   Foreground="{StaticResource Text}"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1"
+                                                   Foreground="{StaticResource TextSubtle}"
+                                                   VerticalAlignment="Center">
+                                            <TextBlock.Text>
+                                                <MultiBinding Converter="{StaticResource AppLayerRuleLabel}">
+                                                    <Binding Path="Binding.LayerIndex" />
+                                                    <Binding Path="DataContext.MainViewModel.Layers" ElementName="SettingsRoot" />
+                                                    <Binding Path="DataContext.MainViewModel.Layers.Count" ElementName="SettingsRoot" />
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                        <Button Grid.Column="2"
+                                                Content="{Binding [Settings_LayerHotkeys_Remove], Source={StaticResource Loc}}"
+                                                Command="{Binding DataContext.RemoveLayerViewHotkeyCommand, ElementName=SettingsRoot}"
+                                                CommandParameter="{Binding}" />
+                                    </Grid>
+                                    <TextBlock Foreground="{StaticResource AccentRed}" FontSize="11"
+                                               TextWrapping="Wrap"
+                                               IsVisible="{Binding HasError}"
+                                               Text="{Binding ErrorMessage}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                </StackPanel>
+            </ScrollViewer>
+        </TabItem>
+
         <!-- Testing tab: temporary scratch area for HID push tests. Remove when done. -->
         <TabItem Header="Testing">
             <ScrollViewer VerticalScrollBarVisibility="Auto">

@@ -102,6 +102,14 @@
   <data name="Settings_Tab_General"><value>General</value></data>
   <data name="Settings_Tab_Layers"><value>Layers</value></data>
   <data name="Settings_Tab_AutoSwitch"><value>Auto-switch</value></data>
+  <data name="Settings_Tab_LayerHotkeys"><value>Layer hotkeys</value></data>
+  <data name="Settings_LayerHotkeys_Title"><value>Hotkey → layer view</value></data>
+  <data name="Settings_LayerHotkeys_Hint"><value>Bind a global hotkey to a layer. Press the hotkey to overlay that layer on the display; press again to revert to the keyboard's reported layer. Works without the keyboard connected.</value></data>
+  <data name="Settings_LayerHotkeys_KeyColumn"><value>Key</value></data>
+  <data name="Settings_LayerHotkeys_LayerColumn"><value>Layer</value></data>
+  <data name="Settings_LayerHotkeys_Add"><value>Add binding</value></data>
+  <data name="Settings_LayerHotkeys_Remove"><value>Remove</value></data>
+  <data name="Settings_LayerHotkeys_Empty"><value>No bindings yet. Add one above.</value></data>
   <data name="Settings_AutoSwitch_Header"><value>App → layer rules</value></data>
   <data name="Settings_AutoSwitch_Hint"><value>Rules are evaluated in order; the first whose match text is a case-insensitive substring of the focused app's process name wins. Editing rules persists immediately. When enabled, the matched layer is pushed to the keyboard on every focus change.</value></data>
   <data name="Settings_AutoSwitch_Enable"><value>Enable auto-switch (push matched layer to keyboard on focus change)</value></data>

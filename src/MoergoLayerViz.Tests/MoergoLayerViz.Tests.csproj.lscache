@@ -60,7 +60,9 @@ AssemblyInfo.cs
 BackgroundOpacityTests.cs
 BoardLayoutModeTests.cs
 CombosRenderingTests.cs
+EffectiveLayerIndexTests.cs
 HoldTapLayerNameTests.cs
+HotkeyLayerViewServiceTests.cs
 KeyboardProfileHidMatcherTests.cs
 LayerColorOverrideTests.cs
 MainWindowViewModelKeyboardPickerTests.cs

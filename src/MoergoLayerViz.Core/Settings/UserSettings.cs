@@ -144,4 +144,15 @@ public record UserSettings
     /// but no spurious text reaches the focused window.
     /// </remarks>
     public Dictionary<string, int> AutoSwitchExitKey { get; init; } = new();
+
+    /// <summary>
+    /// Per-keyboard hotkey → layer-view bindings. Outer key = profile id,
+    /// value = ordered list of <see cref="HotkeyLayerBinding"/>. Pressing a
+    /// bound hotkey overlays the linked layer on the display regardless of
+    /// HID state; pressing it again clears the override (tap-to-toggle).
+    /// Pressing a different bound hotkey switches the override to its layer.
+    /// Separate from <see cref="HotkeyKey"/> / <see cref="HotkeyModifiers"/>,
+    /// which drive the singleton show/hide action.
+    /// </summary>
+    public Dictionary<string, List<HotkeyLayerBinding>> LayerViewHotkeys { get; init; } = new();
 }

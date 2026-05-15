@@ -53,6 +53,12 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         foreach (var r in _mainViewModel.AppLayerRules)
             EditingRules.Add(r);
         EditingRules.CollectionChanged += OnEditingRulesChanged;
+
+        foreach (var b in _mainViewModel.GetActiveLayerViewBindings())
+            EditingLayerViewHotkeys.Add(new LayerViewHotkeyRow(b));
+        EditingLayerViewHotkeys.CollectionChanged += OnLayerViewHotkeysChanged;
+        SyncLayerViewHotkeyErrors();
+
         RebuildLayerEntries();
         RefreshRunningProcesses();
     }
@@ -256,6 +262,131 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         return Loc.Instance.Format("Settings_AutoSwitch_LayerFormat", layer.DisplayName, layer.Index);
     }
 
+    // --- Layer-view hotkeys (per profile) ------------------------------
+    //
+    // Per-keyboard table mapping a global hotkey to a layer index. Edited
+    // here, committed on window close, and applied by
+    // <see cref="HotkeyLayerViewService"/>. Each row carries its
+    // registration outcome so the UI can show inline conflict warnings.
+
+    /// <summary>Editable list of layer-view hotkey rows for the active profile. Seeded in the constructor; committed on close.</summary>
+    public ObservableCollection<LayerViewHotkeyRow> EditingLayerViewHotkeys { get; } = new();
+
+    /// <summary>True when the layer-view hotkey list is empty — drives the empty-state hint.</summary>
+    public bool HasNoEditingLayerViewHotkeys => EditingLayerViewHotkeys.Count == 0;
+
+    /// <summary>Convenience: any of the active bindings failed to register.</summary>
+    public bool AnyLayerViewHotkeyFailed
+    {
+        get
+        {
+            foreach (var row in EditingLayerViewHotkeys)
+                if (row.HasError) return true;
+            return false;
+        }
+    }
+
+    private void OnLayerViewHotkeysChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        OnPropertyChanged(nameof(HasNoEditingLayerViewHotkeys));
+        OnPropertyChanged(nameof(AnyLayerViewHotkeyFailed));
+    }
+
+    /// <summary>F-key picker choices for the "new hotkey" row. Same list as the global show/hide picker (F13–F24 first, then F1–F12).</summary>
+    public IReadOnlyList<string> LayerHotkeyKeyChoices => HotkeyKeyChoices;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddLayerViewHotkeyCommand))]
+    private string? _newLayerHotkeyKey;
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(AddLayerViewHotkeyCommand))]
+    private LayerViewModel? _newLayerHotkeyLayer;
+
+    private bool CanAddLayerViewHotkey() =>
+        !string.IsNullOrWhiteSpace(NewLayerHotkeyKey) && NewLayerHotkeyLayer is not null;
+
+    [RelayCommand(CanExecute = nameof(CanAddLayerViewHotkey))]
+    private void AddLayerViewHotkey()
+    {
+        if (NewLayerHotkeyLayer is null || string.IsNullOrWhiteSpace(NewLayerHotkeyKey)) return;
+        var key = NewLayerHotkeyKey!;
+        const string modifiers = "None";
+        // Upsert by (key, modifiers) so re-picking the same hotkey for a
+        // different layer updates in place instead of creating a duplicate
+        // that would race the registry.
+        for (var i = 0; i < EditingLayerViewHotkeys.Count; i++)
+        {
+            var existing = EditingLayerViewHotkeys[i].Binding;
+            if (existing.KeyName.Equals(key, StringComparison.OrdinalIgnoreCase)
+                && existing.ModifiersName.Equals(modifiers, StringComparison.OrdinalIgnoreCase))
+            {
+                if (existing.LayerIndex != NewLayerHotkeyLayer.Index)
+                    EditingLayerViewHotkeys[i] = new LayerViewHotkeyRow(
+                        new HotkeyLayerBinding(key, modifiers, NewLayerHotkeyLayer.Index));
+                NewLayerHotkeyKey = null;
+                return;
+            }
+        }
+        EditingLayerViewHotkeys.Add(new LayerViewHotkeyRow(
+            new HotkeyLayerBinding(key, modifiers, NewLayerHotkeyLayer.Index)));
+        NewLayerHotkeyKey = null;
+    }
+
+    [RelayCommand]
+    private void RemoveLayerViewHotkey(LayerViewHotkeyRow? row)
+    {
+        if (row is null) return;
+        EditingLayerViewHotkeys.Remove(row);
+    }
+
+    /// <summary>
+    /// Persists the edit buffer for the active profile and asks the host to
+    /// re-bind. Called by <see cref="Views.SettingsWindow"/> on close so
+    /// edits are batched (matches the AppLayerRules commit-on-close UX).
+    /// </summary>
+    public void CommitLayerViewHotkeys()
+    {
+        var snapshot = EditingLayerViewHotkeys.Select(r => r.Binding).ToList();
+        var s = _settingsService.Load();
+        var profileId = _mainViewModel.SelectedKeyboard.Id;
+        var dict = new Dictionary<string, List<HotkeyLayerBinding>>(s.LayerViewHotkeys)
+        {
+            [profileId] = snapshot,
+        };
+        _settingsService.Save(s with { LayerViewHotkeys = dict });
+        _mainViewModel.NotifyLayerViewHotkeysChanged();
+        // The applier pushes results back synchronously via SetLayerViewHotkeyResults
+        // before NotifyLayerViewHotkeysChanged returns, so the freshly populated
+        // results are already visible here.
+        SyncLayerViewHotkeyErrors();
+    }
+
+    /// <summary>
+    /// Aligns each row's error message with the latest
+    /// <c>HotkeyLayerViewService.ApplyBindings</c> outcome. Matches by
+    /// binding value-equality (records). Called on construction and whenever
+    /// <see cref="MainWindowViewModel.LayerViewHotkeyResults"/> changes.
+    /// </summary>
+    private void SyncLayerViewHotkeyErrors()
+    {
+        var results = _mainViewModel.LayerViewHotkeyResults;
+        foreach (var row in EditingLayerViewHotkeys)
+        {
+            string? error = null;
+            foreach (var r in results)
+            {
+                if (r.Binding == row.Binding)
+                {
+                    error = r.Success ? null : r.ErrorMessage;
+                    break;
+                }
+            }
+            row.ErrorMessage = error;
+        }
+        OnPropertyChanged(nameof(AnyLayerViewHotkeyFailed));
+    }
+
     // --- Process picker -------------------------------------------------
 
     /// <summary>Full snapshot of running-process names, dedup'd + sorted. Source
@@ -349,6 +480,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _mainViewModel.PropertyChanged -= OnMainPropertyChanged;
         _mainViewModel.Layers.CollectionChanged -= OnLayersCollectionChanged;
         EditingRules.CollectionChanged -= OnEditingRulesChanged;
+        EditingLayerViewHotkeys.CollectionChanged -= OnLayerViewHotkeysChanged;
     }
 
     /// <summary>Formatted percentage label next to the opacity slider. Reads
@@ -437,6 +569,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             s.OnPropertyChanged(nameof(ExitTapSummary));
             s.OnPropertyChanged(nameof(HasExitTap));
         },
+        [nameof(MainWindowViewModel.LayerViewHotkeyResults)] = s => s.SyncLayerViewHotkeyErrors(),
     };
 
     private void OnMainPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -498,4 +631,26 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
 
     [RelayCommand]
     private Task CheckForUpdatesAsync() => UpdateChecker.CheckAsync();
+}
+
+/// <summary>
+/// Row wrapper for the layer-view hotkey list. Carries the
+/// <see cref="HotkeyLayerBinding"/> being edited plus the latest
+/// registration outcome so the Settings UI can show inline conflicts
+/// (key already owned by another app, unsupported name).
+/// </summary>
+public sealed partial class LayerViewHotkeyRow : ObservableObject
+{
+    public HotkeyLayerBinding Binding { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasError))]
+    private string? _errorMessage;
+
+    public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
+
+    public LayerViewHotkeyRow(HotkeyLayerBinding binding)
+    {
+        Binding = binding;
+    }
 }

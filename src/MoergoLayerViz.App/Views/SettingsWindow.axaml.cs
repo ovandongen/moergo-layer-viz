@@ -23,7 +23,10 @@ public partial class SettingsWindow : Window
     {
         base.OnClosing(e);
         if (DataContext is SettingsViewModel vm)
+        {
             vm.CommitAppLayerRules();
+            vm.CommitLayerViewHotkeys();
+        }
     }
 
     /// <summary>

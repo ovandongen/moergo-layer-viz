@@ -73,6 +73,7 @@ Services/
  AppTheme.cs
  AutoSwitchEngine.cs
  GlobalHotkeyService.cs
+ HotkeyLayerViewService.cs
  Hotkeys/
   HotkeyNameMap.cs
   INativeHotkeyRegistry.cs
