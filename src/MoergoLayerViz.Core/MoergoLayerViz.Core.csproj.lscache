@@ -85,8 +85,8 @@ Persistence/AtomicFile.cs
 Settings/
  AppLayerRule.cs
  AutoSwitchFallbackMode.cs
- HotkeyLayerBinding.cs
  ISettingsService.cs
+ MouseLayerSettings.cs
  SettingsService.cs
  UserSettings.cs
 

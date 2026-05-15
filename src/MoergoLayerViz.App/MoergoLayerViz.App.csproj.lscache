@@ -73,16 +73,25 @@ Services/
  AppTheme.cs
  AutoSwitchEngine.cs
  GlobalHotkeyService.cs
- HotkeyLayerViewService.cs
  Hotkeys/
   HotkeyNameMap.cs
   INativeHotkeyRegistry.cs
   LinuxHotkeyRegistry.cs
+  MacOsFKeyMap.cs
   MacOsHotkeyRegistry.cs
+  MacOsSymbolicHotKeys.cs
   NativeHotkeyRegistryFactory.cs
   WindowsHotkeyRegistry.cs
  KeyHighlightTracker.cs
  LayerSourceCoordinator.cs
+ MouseIdle/
+  IMouseIdleMonitor.cs
+  LinuxMouseIdleMonitor.cs
+  MacOsMouseIdleMonitor.cs
+  MouseIdleMonitorBase.cs
+  MouseIdleMonitorFactory.cs
+  WindowsMouseIdleMonitor.cs
+ MouseLayerEngine.cs
  PlatformCapabilities.cs
  UpdateChecker.cs
  ZmkHidProtocolTraceListener.cs

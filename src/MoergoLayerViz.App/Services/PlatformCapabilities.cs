@@ -1,3 +1,5 @@
+using MoergoLayerViz.App.Services.Hotkeys;
+
 namespace MoergoLayerViz.App.Services;
 
 /// <summary>
@@ -14,4 +16,39 @@ public static class PlatformCapabilities
     /// RegisterHotKey.
     /// </summary>
     public static bool IsGlobalHotkeySupported { get; } = !OperatingSystem.IsLinux();
+
+    /// <summary>
+    /// F-keys offered in the hotkey pickers, in display order (F13–F24 first
+    /// since they're effectively always free, then F1–F12). Filtered per
+    /// platform to drop keys we either can't register or that the OS
+    /// already claims as a bare F-key (registration looks fine in the log
+    /// but the press never fires).
+    ///
+    /// macOS: filter is built from <c>CopySymbolicHotKeys</c>, which returns
+    /// the OS's live symbolic hotkey table (defaults merged with user
+    /// overrides). We also drop F21–F24 since they have no documented
+    /// Carbon VK and can't be registered. Sampled once at startup —
+    /// changing system shortcuts mid-session requires an app restart for
+    /// the picker to refresh.
+    ///
+    /// Windows / Linux: no filtering. (Linux's registry stub fails cleanly
+    /// regardless, and the hotkey UI is hidden when global hotkeys aren't
+    /// supported.)
+    /// </summary>
+    public static IReadOnlyList<string> AvailableFKeys { get; } = BuildAvailableFKeys();
+
+    private static IReadOnlyList<string> BuildAvailableFKeys()
+    {
+        var high = Enumerable.Range(13, 12); // F13..F24
+        var low = Enumerable.Range(1, 12);   // F1..F12
+        if (OperatingSystem.IsMacOS())
+        {
+            var claimed = MacOsSymbolicHotKeys.GetClaimedFKeyIndices();
+            return high.Concat(low)
+                .Where(n => MacOsFKeyMap.GetCarbonVk(n) is not null && !claimed.Contains(n))
+                .Select(n => $"F{n}")
+                .ToArray();
+        }
+        return high.Concat(low).Select(n => $"F{n}").ToArray();
+    }
 }

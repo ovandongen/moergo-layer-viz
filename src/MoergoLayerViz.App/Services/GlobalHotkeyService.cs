@@ -8,7 +8,7 @@ namespace MoergoLayerViz.App.Services;
 /// <see cref="INativeHotkeyRegistry"/>, which uses native OS APIs (Carbon
 /// <c>RegisterEventHotKey</c> on macOS, User32 <c>RegisterHotKey</c> on
 /// Windows). These APIs require no Accessibility / Input-Monitoring
-/// permission on macOS — replacing the previous SharpHook-based path.
+/// permission on macOS.
 /// </summary>
 public class GlobalHotkeyService : IDisposable
 {

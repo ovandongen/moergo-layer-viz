@@ -53,6 +53,8 @@ internal sealed class MacOsHotkeyRegistry : INativeHotkeyRegistry
         var status = InstallEventHandler(target, _handlerDelegate, 1, ref spec, IntPtr.Zero, out _handlerRef);
         if (status != 0)
             DiagnosticLog.Warn("HotkeyMac", $"InstallEventHandler failed (status {status})");
+        else
+            DiagnosticLog.Info("HotkeyMac", $"InstallEventHandler ok, target=0x{target.ToInt64():X}, handlerRef=0x{_handlerRef.ToInt64():X}");
     }
 
     public HotkeyRegistration TryRegister(string keyName, string modifiersName, Action onPress)
@@ -61,7 +63,7 @@ internal sealed class MacOsHotkeyRegistry : INativeHotkeyRegistry
 
         var fIndex = HotkeyNameMap.TryParseFKeyIndex(keyName);
         if (fIndex is null) return HotkeyRegistration.Failed($"unsupported key '{keyName}'");
-        var vk = MapFKeyToCarbonVk(fIndex.Value);
+        var vk = MacOsFKeyMap.GetCarbonVk(fIndex.Value);
         if (vk is null) return HotkeyRegistration.Failed($"no Carbon VK for '{keyName}'");
 
         uint modMask = 0;
@@ -122,7 +124,11 @@ internal sealed class MacOsHotkeyRegistry : INativeHotkeyRegistry
             var size = (uint)Marshal.SizeOf<EventHotKeyID>();
             var status = GetEventParameter(theEvent, ParamHotKey, TypeHotKey,
                 IntPtr.Zero, size, IntPtr.Zero, ref id);
-            if (status != 0) return 0;
+            if (status != 0)
+            {
+                DiagnosticLog.Warn("HotkeyMac", $"GetEventParameter failed (status {status})");
+                return 0;
+            }
             if (id.signature != Signature) return 0;
 
             if (_byToken.TryGetValue((int)id.id, out var entry))
@@ -138,35 +144,12 @@ internal sealed class MacOsHotkeyRegistry : INativeHotkeyRegistry
         return 0;
     }
 
-    private static int? MapFKeyToCarbonVk(int fIndex) => fIndex switch
-    {
-        1 => 0x7A,
-        2 => 0x78,
-        3 => 0x63,
-        4 => 0x76,
-        5 => 0x60,
-        6 => 0x61,
-        7 => 0x62,
-        8 => 0x64,
-        9 => 0x65,
-        10 => 0x6D,
-        11 => 0x67,
-        12 => 0x6F,
-        13 => 0x69,
-        14 => 0x6B,
-        15 => 0x71,
-        16 => 0x6A,
-        17 => 0x40,
-        18 => 0x4F,
-        19 => 0x50,
-        20 => 0x5A,
-        // F21–F24 have no documented Carbon VKs; macOS reserves them for OEM use.
-        _ => null,
-    };
-
-    // 'hkey' four-cc + UInt32 type.
-    private static readonly uint ParamHotKey = ('h' << 24) | ('k' << 16) | ('e' << 8) | 'y';
-    private static readonly uint TypeHotKey = ('h' << 24) | ('k' << 16) | ('e' << 8) | 'y';
+    // For kEventHotKeyPressed, the EventHotKeyID is delivered as
+    // kEventParamDirectObject ('----'), with type typeEventHotKeyID ('hkid').
+    // Using 'hkey' for either yields eventParameterNotFoundErr (-9870) and the
+    // handler silently drops every press.
+    private const uint ParamHotKey = ('-' << 24) | ('-' << 16) | ('-' << 8) | '-';
+    private const uint TypeHotKey = ('h' << 24) | ('k' << 16) | ('i' << 8) | 'd';
 
     [StructLayout(LayoutKind.Sequential)]
     private struct EventHotKeyID

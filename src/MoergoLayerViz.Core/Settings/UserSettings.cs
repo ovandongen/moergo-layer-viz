@@ -146,13 +146,12 @@ public record UserSettings
     public Dictionary<string, int> AutoSwitchExitKey { get; init; } = new();
 
     /// <summary>
-    /// Per-keyboard hotkey → layer-view bindings. Outer key = profile id,
-    /// value = ordered list of <see cref="HotkeyLayerBinding"/>. Pressing a
-    /// bound hotkey overlays the linked layer on the display regardless of
-    /// HID state; pressing it again clears the override (tap-to-toggle).
-    /// Pressing a different bound hotkey switches the override to its layer.
-    /// Separate from <see cref="HotkeyKey"/> / <see cref="HotkeyModifiers"/>,
-    /// which drive the singleton show/hide action.
+    /// Per-keyboard mouse-movement layer-push configuration. Outer key =
+    /// profile id, value = the settings for that profile. Missing entries
+    /// resolve to a disabled default (<see cref="MouseLayerSettings"/> with
+    /// defaults). When enabled and HID-connected, mouse movement pushes
+    /// <see cref="MouseLayerSettings.MouseLayerIndex"/>; idleness reverts to
+    /// the configured target.
     /// </summary>
-    public Dictionary<string, List<HotkeyLayerBinding>> LayerViewHotkeys { get; init; } = new();
+    public Dictionary<string, MouseLayerSettings> MouseLayer { get; init; } = new();
 }

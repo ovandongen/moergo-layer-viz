@@ -9,6 +9,7 @@ using Avalonia.Threading;
 using MoergoLayerViz.App.Localization;
 using MoergoLayerViz.App.Services;
 using MoergoLayerViz.App.Services.Hotkeys;
+using MoergoLayerViz.App.Services.MouseIdle;
 using MoergoLayerViz.App.ViewModels;
 using MoergoLayerViz.App.Views;
 using MoergoLayerViz.Core.Diagnostics;
@@ -60,8 +61,7 @@ public partial class App : Application
                 DiagnosticLog.SetMinimumLevel(logLevel);
 
             // Native global-hotkey registry (Carbon on macOS, User32 on
-            // Windows, no-op on Linux). Replaces the previous SharpHook/
-            // libuiohook-based hook — no Accessibility prompt on macOS.
+            // Windows, no-op on Linux).
             var hotkeyRegistry = NativeHotkeyRegistryFactory.Create();
             desktop.Exit += (_, _) => hotkeyRegistry.Dispose();
 
@@ -78,8 +78,15 @@ public partial class App : Application
                 DiagnosticLog.Warn("Startup", $"ActiveWindowMonitor unavailable: {ex.Message}");
             }
 
+            // Global mouse-idle monitor (NSEvent / CGEventGetLocation polling
+            // on macOS, WH_MOUSE_LL on Windows, no-op stub on Linux). The
+            // engine starts/stops it on demand based on the master toggle +
+            // HID-connected state. App owns disposal.
+            IMouseIdleMonitor mouseIdleMonitor = MouseIdleMonitorFactory.Create();
+            desktop.Exit += (_, _) => mouseIdleMonitor.Dispose();
+
             DiagnosticLog.Info("Startup", "Creating MainWindowViewModel...");
-            var viewModel = new MainWindowViewModel(settingsService, activeWindowMonitor);
+            var viewModel = new MainWindowViewModel(settingsService, activeWindowMonitor, mouseIdleMonitor);
             var mainWindow = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = mainWindow;
 
@@ -260,23 +267,6 @@ public partial class App : Application
             viewModel.HotkeyKeyChanged += newKey =>
                 _hotkeyService.UpdateHotkey(newKey, viewModel.HotkeyModifiers);
             desktop.Exit += (_, _) => _hotkeyService.Dispose();
-
-            // Per-profile "layer view" hotkeys. The service swaps registrations
-            // on profile change and after Settings persists an edit; press
-            // events route through ToggleLayerViewOverride (tap-to-toggle).
-            // Per-binding outcomes are pushed back to the VM so the Settings
-            // UI can show inline conflict warnings.
-            var layerViewService = new HotkeyLayerViewService(
-                hotkeyRegistry,
-                viewModel.ToggleLayerViewOverride);
-            void RebindLayerView()
-            {
-                var results = layerViewService.ApplyBindings(viewModel.GetActiveLayerViewBindings());
-                viewModel.SetLayerViewHotkeyResults(results);
-            }
-            RebindLayerView();
-            viewModel.LayerViewHotkeysChanged += RebindLayerView;
-            desktop.Exit += (_, _) => layerViewService.Dispose();
 
             // Restore the last-loaded layout (or show a "pick a file" prompt).
             Dispatcher.UIThread.Post(() => viewModel.InitializeAsync(), DispatcherPriority.Background);
