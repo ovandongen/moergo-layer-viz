@@ -186,7 +186,7 @@
              Pushing layers to firmware needs the Raw HID source connected; the
              tab is hidden while we're still searching for the keyboard. -->
         <TabItem Header="{Binding [Settings_Tab_AutoSwitch], Source={StaticResource Loc}}"
-                 IsVisible="{Binding MainViewModel.IsHidSourceActive}">
+                 IsVisible="{Binding MainViewModel.IsAppRulesTabVisible}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="20" Spacing="16">
 

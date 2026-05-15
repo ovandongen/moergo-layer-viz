@@ -78,6 +78,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     /// <summary>True while the HID source is connected.</summary>
     [ObservableProperty] private bool _isHidSourceActive;
+
+    /// <summary>App-rules settings tab: hidden on Linux (no active-window API) and when HID is disconnected.</summary>
+    public bool IsAppRulesTabVisible => !OperatingSystem.IsLinux() && IsHidSourceActive;
+
+    partial void OnIsHidSourceActiveChanged(bool value) => OnPropertyChanged(nameof(IsAppRulesTabVisible));
+
     [ObservableProperty] private bool _isAlwaysOnTop;
     [ObservableProperty] private bool _isLiveHighlightingEnabled;
     [ObservableProperty] private bool _isAutoLayerSwitchEnabled;
