@@ -449,6 +449,33 @@
 
                     <Separator Margin="0,8" />
 
+                    <TextBlock Text="HID queries (shared module)"
+                               FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
+                    <TextBlock Text="Sends 0xFD GetDeviceInfo / 0xFB GetConfigId and waits up to 1s for the matching reply."
+                               Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                    <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto" Margin="0,4,0,0" ColumnSpacing="8" RowSpacing="6">
+                        <Button Grid.Row="0" Grid.Column="0"
+                                Content="Query device info"
+                                HorizontalAlignment="Stretch"
+                                Command="{Binding QueryDeviceInfoCommand}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                   Text="{Binding DeviceInfoResult}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource Text}"
+                                   TextWrapping="Wrap" />
+                        <Button Grid.Row="1" Grid.Column="0"
+                                Content="Query config ID"
+                                HorizontalAlignment="Stretch"
+                                Command="{Binding QueryConfigIdCommand}" />
+                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                   Text="{Binding ConfigIdResult}"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource Text}"
+                                   TextWrapping="Wrap" />
+                    </Grid>
+
+                    <Separator Margin="0,8" />
+
                     <TextBlock Text="Active window (focus follows OS)"
                                FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
                     <TextBlock Text="Updates within ~500 ms of focus change. WindowTitle is null on macOS by design (no Accessibility entitlement)."

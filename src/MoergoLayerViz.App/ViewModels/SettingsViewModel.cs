@@ -73,6 +73,35 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    // ── HID query test buttons (Testing tab) ──────────────────────────────
+    // Result strings show "(not run)" until the user clicks the button,
+    // then either the parsed value or a "(no reply)" / "(no device)" hint.
+    // 1s timeout matches the firmware's typical reply latency; failure is
+    // logged through DiagnosticLog inside MainWindowViewModel.
+
+    [ObservableProperty] private string _deviceInfoResult = "(not run)";
+    [ObservableProperty] private string _configIdResult = "(not run)";
+
+    [RelayCommand]
+    private async Task QueryDeviceInfoAsync()
+    {
+        DeviceInfoResult = "(querying…)";
+        var info = await _mainViewModel.QueryDeviceInfoAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
+        DeviceInfoResult = info is null
+            ? "(no reply)"
+            : $"protocol v{info.ProtocolVersion}, name=\"{info.Name}\"";
+    }
+
+    [RelayCommand]
+    private async Task QueryConfigIdAsync()
+    {
+        ConfigIdResult = "(querying…)";
+        var id = await _mainViewModel.QueryConfigIdAsync(TimeSpan.FromSeconds(1), CancellationToken.None);
+        ConfigIdResult = id is null
+            ? "(no reply)"
+            : id.Length == 0 ? "(empty)" : id;
+    }
+
     // --- Auto-switch (Phase 2: author + persist rules, preview match;
     //                   Phase 3 Slice A: master toggle drives firing + monitor gating) ---
 

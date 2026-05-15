@@ -15,6 +15,7 @@ using MoergoLayerViz.Core.Models;
 using MoergoLayerViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
 using ZmkHidProtocol.Building;
+using ZmkHidProtocol.Protocol;
 using ZmkHidProtocol.Transport;
 
 namespace MoergoLayerViz.App.ViewModels;
@@ -905,6 +906,47 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private void SelectLayer(int index)
     {
         ApplyActiveLayer(index);
+    }
+
+    /// <summary>
+    /// Sends a 0xFD GetDeviceInfo request and awaits the 0xFE reply.
+    /// Returns null when no HID is connected, on timeout, or on transport
+    /// failure. Test-tab plumbing only.
+    /// </summary>
+    public async Task<DeviceInfo?> QueryDeviceInfoAsync(TimeSpan timeout, CancellationToken ct)
+    {
+        var sender = _commandSender;
+        if (sender is null) return null;
+        try
+        {
+            return await sender.QueryDeviceInfoAsync(timeout, ct);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Warn("HidQuery", $"device-info query failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Sends a 0xFB GetConfigId request and awaits the 0xFA reply.
+    /// Returns null when no HID is connected, on timeout, or on transport
+    /// failure. Empty string means the firmware has no
+    /// CONFIG_HID_VIZ_CONFIG_ID set. Test-tab plumbing only.
+    /// </summary>
+    public async Task<string?> QueryConfigIdAsync(TimeSpan timeout, CancellationToken ct)
+    {
+        var sender = _commandSender;
+        if (sender is null) return null;
+        try
+        {
+            return await sender.QueryConfigIdAsync(timeout, ct);
+        }
+        catch (Exception ex)
+        {
+            DiagnosticLog.Warn("HidQuery", $"config-id query failed: {ex.Message}");
+            return null;
+        }
     }
 
     public void PushLayerToKeyboard(int index)
