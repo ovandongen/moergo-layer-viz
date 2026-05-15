@@ -18,26 +18,25 @@ public static class PlatformCapabilities
     public static bool IsGlobalHotkeySupported { get; } = !OperatingSystem.IsLinux();
 
     /// <summary>
-    /// F-keys offered in the hotkey pickers, in display order (F13–F24 first
+    /// F-keys offered in the hotkey picker, in display order (F13–F24 first
     /// since they're effectively always free, then F1–F12). Filtered per
-    /// platform to drop keys we either can't register or that the OS
-    /// already claims as a bare F-key (registration looks fine in the log
-    /// but the press never fires).
+    /// platform to drop keys we either can't register or that another
+    /// process / the OS already claims as a bare F-key.
     ///
     /// macOS: filter is built from <c>CopySymbolicHotKeys</c>, which returns
     /// the OS's live symbolic hotkey table (defaults merged with user
-    /// overrides). We also drop F21–F24 since they have no documented
-    /// Carbon VK and can't be registered. Sampled once at startup —
-    /// changing system shortcuts mid-session requires an app restart for
-    /// the picker to refresh.
+    /// overrides). F21–F24 are also dropped — no documented Carbon VK.
     ///
-    /// Windows / Linux: no filtering. (Linux's registry stub fails cleanly
-    /// regardless, and the hotkey UI is hidden when global hotkeys aren't
-    /// supported.)
+    /// Windows: filter is built by probing <c>RegisterHotKey</c> for each
+    /// F-key with no modifier — any key another process has claimed returns
+    /// ERROR_HOTKEY_ALREADY_REGISTERED. <paramref name="currentlyOwnedKey"/>
+    /// is the key our own <c>GlobalHotkeyService</c> currently holds; we
+    /// pass it through so the picker doesn't strike it out.
+    ///
+    /// Linux: no filtering (the registry stub fails cleanly regardless, and
+    /// the hotkey UI is hidden when global hotkeys aren't supported).
     /// </summary>
-    public static IReadOnlyList<string> AvailableFKeys { get; } = BuildAvailableFKeys();
-
-    private static IReadOnlyList<string> BuildAvailableFKeys()
+    public static IReadOnlyList<string> GetAvailableFKeys(string? currentlyOwnedKey = null)
     {
         var high = Enumerable.Range(13, 12); // F13..F24
         var low = Enumerable.Range(1, 12);   // F1..F12
@@ -46,6 +45,14 @@ public static class PlatformCapabilities
             var claimed = MacOsSymbolicHotKeys.GetClaimedFKeyIndices();
             return high.Concat(low)
                 .Where(n => MacOsFKeyMap.GetCarbonVk(n) is not null && !claimed.Contains(n))
+                .Select(n => $"F{n}")
+                .ToArray();
+        }
+        if (OperatingSystem.IsWindows())
+        {
+            var claimed = WindowsFreeFKeys.GetClaimedFKeyIndices(currentlyOwnedKey);
+            return high.Concat(low)
+                .Where(n => !claimed.Contains(n))
                 .Select(n => $"F{n}")
                 .ToArray();
         }

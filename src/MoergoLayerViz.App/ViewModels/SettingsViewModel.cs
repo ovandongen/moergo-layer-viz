@@ -35,6 +35,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     {
         _settingsService = settingsService;
         _mainViewModel = mainViewModel;
+        HotkeyKeyChoices = PlatformCapabilities.GetAvailableFKeys(mainViewModel.HotkeyKey);
         _mainViewModel.PropertyChanged += OnMainPropertyChanged;
         _mainViewModel.Layers.CollectionChanged += OnLayersCollectionChanged;
         UpdateChecker.PropertyChanged += (_, e) =>
@@ -402,10 +403,14 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
     public string PressHighlightColorHex => _mainViewModel.PressHighlightColor;
 
     /// <summary>F-key choices offered for the global hotkey. F13–F24 first
-    /// (effectively always free), then F1–F12. macOS-claimed and
-    /// Carbon-unsupported keys are filtered out — see
-    /// <see cref="PlatformCapabilities.AvailableFKeys"/>.</summary>
-    public static IReadOnlyList<string> HotkeyKeyChoices => PlatformCapabilities.AvailableFKeys;
+    /// (effectively always free), then F1–F12. Filtered per OS — macOS
+    /// drops keys claimed by symbolic hotkeys, Windows probes
+    /// <c>RegisterHotKey</c> and drops anything another process already owns.
+    /// Computed once when this VM is constructed (i.e. on each Settings
+    /// window open) so the data is fresh every time, and the user's own
+    /// current pick is excluded from the claim set so it stays selectable.
+    /// See <see cref="PlatformCapabilities.GetAvailableFKeys"/>.</summary>
+    public IReadOnlyList<string> HotkeyKeyChoices { get; }
 
     /// <summary>Shortcut to <see cref="PlatformCapabilities.IsGlobalHotkeySupported"/>
     /// for XAML bindings on the General tab.</summary>
