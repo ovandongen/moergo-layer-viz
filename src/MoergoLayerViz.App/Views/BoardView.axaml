@@ -9,8 +9,8 @@
              x:DataType="vm:IBoardSurface">
 
     <UserControl.Resources>
-        <!-- All brushes (KeyStroke, KeyUntrackableStroke, ComboFill, ComboStroke)
-             live in App.axaml — keep this dictionary template-only. -->
+        <!-- All brushes (KeyStroke, ComboFill, ComboStroke) live in App.axaml
+             — keep this dictionary template-only. -->
 
         <!-- Single key template, shared between the two per-hand ItemsControls
              below so we don't have to keep two copies in sync. -->
@@ -64,13 +64,6 @@
                       Fill="{StaticResource ComboFill}"
                       Stroke="{StaticResource ComboStroke}"
                       StrokeThickness="1" />
-
-                <!-- Untrackable-layer warning: pink border over the base fill -->
-                <Rectangle RadiusX="6" RadiusY="6"
-                           Stroke="{StaticResource KeyUntrackableStroke}"
-                           StrokeThickness="2"
-                           Fill="Transparent"
-                           IsVisible="{Binding IsUntrackableLayerSwitch}" />
 
                 <!-- Category hint in the top-left corner (e.g. "To Layer",
                      "Layer Tap") — distinguishes layer-switch keys at a

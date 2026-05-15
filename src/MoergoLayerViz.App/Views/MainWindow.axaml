@@ -141,7 +141,7 @@
                             </Button.Flyout>
                         </Button>
 
-                        <!-- Live key highlighting (SharpHook-driven pressed-key glow) -->
+                        <!-- Live key highlighting — pulses a key cap when the firmware reports a press over HID -->
                         <Button x:Name="LiveButton"
                                 Command="{Binding ToggleLiveHighlightingCommand}"
                                 Classes="toggle"
@@ -152,13 +152,12 @@
                                       Data="M3 12h4l3-8 4 16 3-8h4" />
                         </Button>
 
-                        <!-- Auto layer switch — follows signal-macro keys -->
+                        <!-- Auto layer switch — drives the app→layer rules engine -->
                         <Button x:Name="AutoLayerButton"
                                 Command="{Binding ToggleAutoLayerSwitchCommand}"
                                 Classes="toggle"
                                 Classes.active="{Binding IsAutoLayerSwitchEnabled}"
                                 Padding="8,4"
-                                IsVisible="{Binding IsLiveHighlightingEnabled}"
                                 ToolTip.Tip="{Binding [Tooltip_AutoLayerSwitch], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
                                       Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
@@ -182,16 +181,6 @@
                                 ToolTip.Tip="{Binding [Tooltip_LoadLayout], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
                                       Data="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
-                        </Button>
-
-                        <!-- Generate signal macros + hold-taps from loaded JSON -->
-                        <Button x:Name="GenerateSignalsButton"
-                                Command="{Binding OpenGenerateSignalsCommand}"
-                                Padding="8,4"
-                                IsVisible="{Binding HasLayoutLoaded}"
-                                ToolTip.Tip="{Binding [Tooltip_GenerateSignals], Source={StaticResource Loc}}">
-                            <PathIcon Width="14" Height="14"
-                                      Data="M7 2v11h3v9l7-12h-4l4-8z" />
                         </Button>
 
                         <!-- Refresh loaded JSON from disk -->

@@ -33,9 +33,7 @@ public partial class KeyViewModel : ObservableObject
     private const string DarkForeground = AppTheme.BgBaseHex;
     private const string LightForeground = AppTheme.KeyDefaultFillHex;
 
-    [ObservableProperty] private bool _isLayerSignalKey;
     [ObservableProperty] private bool _isPressed;
-    [ObservableProperty] private bool _isUntrackableLayerSwitch;
     [ObservableProperty] private bool _isInCombo;
     [ObservableProperty] private string _tooltip = "";
 
@@ -140,18 +138,16 @@ public partial class KeyViewModel : ObservableObject
     /// is layered on afterwards via <see cref="SetCombos"/>, once every key's
     /// label is settled (so the combo tooltip can name participants by label).
     /// </summary>
-    public void ApplyBinding(KeyBinding binding, bool isSignalMacro, bool isUntrackable, int? targetLayer, string? targetLayerName, string profileId, HoldTap? holdTap = null, SignalMacro? signal = null)
+    public void ApplyBinding(KeyBinding binding, int? targetLayer, string? targetLayerName, string profileId, HoldTap? holdTap = null)
     {
         Behavior = binding.Behavior;
-        IsLayerSignalKey = isSignalMacro;
-        IsUntrackableLayerSwitch = isUntrackable;
         IsInCombo = false;
         KeyFillColor = ResolveFillColor(binding, targetLayer, profileId);
         IconName = KeyLabelFormatter.NormalizeIconName(binding.DecorationIcon);
-        _baseTooltip = BuildTooltip(binding, targetLayerName, holdTap, signal);
+        _baseTooltip = BuildTooltip(binding, targetLayerName, holdTap);
         Tooltip = _baseTooltip;
 
-        var (label, sub, topLeft) = ComputeLabels(binding, targetLayerName, holdTap, signal);
+        var (label, sub, topLeft) = ComputeLabels(binding, targetLayerName, holdTap);
         Label = label;
         Subscript = sub;
         TopLeftLabel = topLeft;
@@ -164,11 +160,11 @@ public partial class KeyViewModel : ObservableObject
     /// wins cleanly. Otherwise delegates to <see cref="KeyLabelFormatter.FormatBinding"/>.
     /// </summary>
     private (string Label, string Subscript, string TopLeft) ComputeLabels(
-        KeyBinding binding, string? targetLayerName, HoldTap? holdTap, SignalMacro? signal)
+        KeyBinding binding, string? targetLayerName, HoldTap? holdTap)
     {
         if (!string.IsNullOrEmpty(IconName))
             return (binding.DecorationLabel ?? "", "", "");
-        return KeyLabelFormatter.FormatBinding(binding, targetLayerName, holdTap, signal);
+        return KeyLabelFormatter.FormatBinding(binding, targetLayerName, holdTap);
     }
 
     /// <summary>
@@ -177,15 +173,15 @@ public partial class KeyViewModel : ObservableObject
     /// separated by blank lines:
     /// <list type="bullet">
     /// <item>Header: position + raw binding (<c>&amp;kp LS(LBKT)</c>, …)</item>
-    /// <item>Category: hold-tap / signal-macro / standard layer-switch detail</item>
+    /// <item>Category: hold-tap / standard layer-switch detail</item>
     /// <item>Decoration: user-authored label and background hex if present</item>
     /// </list>
     /// </summary>
-    private string BuildTooltip(KeyBinding b, string? targetLayerName, HoldTap? holdTap, SignalMacro? signal)
+    private string BuildTooltip(KeyBinding b, string? targetLayerName, HoldTap? holdTap)
     {
         var sections = new List<string> { BuildHeaderSection(b) };
 
-        var category = KeyLabelFormatter.BuildCategorySection(b, targetLayerName, holdTap, signal);
+        var category = KeyLabelFormatter.BuildCategorySection(b, targetLayerName, holdTap);
         if (category is not null) sections.Add(category);
 
         var decoration = KeyLabelFormatter.BuildDecorationSection(b);
@@ -228,7 +224,7 @@ public partial class KeyViewModel : ObservableObject
     /// Fill-color precedence:
     /// <list type="number">
     /// <item><c>decoration.background</c> from the Moergo editor (user-authored).</item>
-    /// <item>Target layer's palette color (for <c>&amp;lt</c> and signal-macro keys).</item>
+    /// <item>Target layer's palette color (for <c>&amp;lt</c> keys).</item>
     /// <item>Default key fill.</item>
     /// </list>
     /// </summary>

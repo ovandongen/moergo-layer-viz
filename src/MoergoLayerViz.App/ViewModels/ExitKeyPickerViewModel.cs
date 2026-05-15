@@ -43,8 +43,6 @@ public partial class ExitKeyPickerViewModel : ObservableObject, IBoardSurface
                 TopLeftLabel = "",
                 Behavior = "",
                 KeyFillColor = DefaultFill,
-                IsLayerSignalKey = false,
-                IsUntrackableLayerSwitch = false,
                 IsInCombo = false,
                 IsPressed = false,
                 Tooltip = pos.Description ?? $"#{pos.Index}",

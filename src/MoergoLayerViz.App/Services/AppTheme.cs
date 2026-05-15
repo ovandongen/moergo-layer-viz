@@ -46,7 +46,6 @@ internal static class AppTheme
     public const string KeyDefaultFillHex = "#F2F2F2"; // off-white cap; also bright foreground on dark fills
     public const string KeyStrokeHex = "#B0B0B0";
     public const string KeyLayerFillHex = "#1F8B4C";   // fallback green for layer-target caps
-    public const string KeyUntrackableStrokeHex = "#E64980";
 
     // ─── Press highlight (default) ──────────────────────────────────────
     public const string PressHighlightDefaultHex = "#FFD60A";       // user-customizable; this is the seed

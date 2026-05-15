@@ -6,24 +6,24 @@ namespace MoergoLayerViz.Core.Keymap;
 /// Resolves the binding that actually fires at a given (layer, key) position,
 /// walking the <c>&amp;trans</c> fall-through chain via a precomputed
 /// predecessor graph. Stateless w.r.t. callers — construct once per
-/// <see cref="KeyboardConfig"/> + <see cref="SignalMacro"/> list and reuse.
+/// <see cref="KeyboardConfig"/> and reuse.
 /// </summary>
 public sealed class LayerBindingResolver
 {
     private readonly KeyboardConfig _config;
     private readonly Dictionary<int, HashSet<int>> _layerPredecessors;
 
-    public LayerBindingResolver(KeyboardConfig config, IReadOnlyList<SignalMacro> signalMacros)
+    public LayerBindingResolver(KeyboardConfig config)
     {
         _config = config;
-        _layerPredecessors = BuildLayerPredecessors(config, signalMacros);
+        _layerPredecessors = BuildLayerPredecessors(config);
     }
 
     /// <summary>
     /// Reverse adjacency: <c>layer → set of layers that can push this layer onto
-    /// the active stack</c> (via <c>&amp;mo / &amp;lt / &amp;sl / &amp;tog</c>
-    /// or a signal macro). <c>&amp;to</c> is excluded — it replaces the default
-    /// layer rather than stacking above it.
+    /// the active stack</c> (via <c>&amp;mo / &amp;lt / &amp;sl / &amp;tog</c>).
+    /// <c>&amp;to</c> is excluded — it replaces the default layer rather than
+    /// stacking above it.
     /// </summary>
     public IReadOnlyDictionary<int, HashSet<int>> LayerPredecessors => _layerPredecessors;
 
@@ -71,16 +71,12 @@ public sealed class LayerBindingResolver
 
     /// <summary>
     /// For a key binding, returns which layer it activates when pressed
-    /// (if any). Signal macros route through <see cref="SignalMacro.LayerParamIndex"/>;
-    /// the bare ZMK layer-switch behaviors (<c>&amp;to / &amp;mo / &amp;tog /
-    /// &amp;lt / &amp;sl</c>) read their first param directly. Returns null
-    /// for non-layer-switching bindings.
+    /// (if any). The bare ZMK layer-switch behaviors (<c>&amp;to / &amp;mo /
+    /// &amp;tog / &amp;lt / &amp;sl</c>) read their first param directly.
+    /// Returns null for non-layer-switching bindings.
     /// </summary>
-    public static int? ResolveTargetLayer(KeyBinding binding, SignalMacro? signal, HoldTap? holdTap = null)
+    public static int? ResolveTargetLayer(KeyBinding binding, HoldTap? holdTap = null)
     {
-        if (signal is not null && signal.TryResolveTargetLayer(binding, out var signalLayer))
-            return signalLayer;
-
         if ((binding.Behavior == "&to" || binding.Behavior == "&mo"
              || binding.Behavior == "&tog" || binding.Behavior == "&lt"
              || binding.Behavior == "&sl")
@@ -100,12 +96,9 @@ public sealed class LayerBindingResolver
         return null;
     }
 
-    private static Dictionary<int, HashSet<int>> BuildLayerPredecessors(
-        KeyboardConfig config,
-        IReadOnlyList<SignalMacro> signalMacros)
+    private static Dictionary<int, HashSet<int>> BuildLayerPredecessors(KeyboardConfig config)
     {
         var result = new Dictionary<int, HashSet<int>>();
-        var signalByName = LayerSignalTable.BuildSignalLookup(config, signalMacros);
 
         for (int m = 0; m < config.Layers.Count; m++)
         {
@@ -118,11 +111,6 @@ public sealed class LayerBindingResolver
                     && b.Params.Count >= 1 && int.TryParse(b.Params[0], out var bareLayer))
                 {
                     target = bareLayer;
-                }
-                else if (signalByName.TryGetValue(b.Behavior, out var sig)
-                    && sig.TryResolveTargetLayer(b, out var sigLayer))
-                {
-                    target = sigLayer;
                 }
 
                 if (target is int n && n >= 0 && n < config.Layers.Count && n != m)

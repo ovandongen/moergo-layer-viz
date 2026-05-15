@@ -19,7 +19,6 @@ public static class KeyLabelFormatter
     /// strict precedence order:
     /// <list type="number">
     /// <item>User-authored <c>decoration.label</c> — overrides everything.</item>
-    /// <item>Signal-macro wrapper (alone) — &amp;to-style layer label with a "Macro" badge.</item>
     /// <item>Hold-tap — tap-side keycode as main label, hold-side layer or keycode as subscript.</item>
     /// <item>Standard ZMK behavior with declared arity (<c>&amp;kp</c>, <c>&amp;mo</c>, <c>&amp;bt</c>, …).</item>
     /// <item>Moergo macro conventions (<c>&amp;HRM_*</c>, <c>&amp;bt_*</c>).</item>
@@ -27,7 +26,7 @@ public static class KeyLabelFormatter
     /// </list>
     /// </summary>
     public static (string Label, string Subscript, string TopLeft) FormatBinding(
-        KeyBinding b, string? targetLayerName, HoldTap? holdTap = null, SignalMacro? signal = null)
+        KeyBinding b, string? targetLayerName, HoldTap? holdTap = null)
     {
         if (!string.IsNullOrEmpty(b.DecorationLabel))
             return (b.DecorationLabel, "", "");
@@ -36,26 +35,12 @@ public static class KeyLabelFormatter
         // can break long layer names onto multiple lines; tooltip keeps the raw form.
         var layerName = targetLayerName is null ? null : FormatLayerName(targetLayerName);
 
-        // A signal-wrapped hold-tap falls through to the hold-tap path on
-        // purpose: that shape (tap keycode as main, layer name as subscript)
-        // is more informative than the bare "Macro" badge for &ht_* wrappers.
-        if (signal is not null && holdTap is null)
-            return FormatSignalMacro(b, signal, layerName);
-
         if (holdTap is not null)
             return FormatHoldTap(b, holdTap, targetLayerName, layerName);
 
         return TryFormatStandardBehavior(b, layerName)
             ?? TryFormatMacroConvention(b)
             ?? FormatFallback(b);
-    }
-
-    private static (string Label, string Subscript, string TopLeft) FormatSignalMacro(
-        KeyBinding b, SignalMacro signal, string? layerName)
-    {
-        var label = layerName
-            ?? (signal.TryResolveTargetLayer(b, out var idx) ? "L" + idx : b.Behavior.TrimStart('&'));
-        return (label, "", "Macro");
     }
 
     /// <summary>
@@ -193,38 +178,29 @@ public static class KeyLabelFormatter
     // ─── Tooltip sections ─────────────────────────────────────────────────
 
     /// <summary>
-    /// Hold-tap / signal-macro / standard layer-switch tooltip section, or
-    /// null when the binding isn't one of those categories.
+    /// Hold-tap / standard layer-switch tooltip section, or null when the
+    /// binding isn't one of those categories.
     /// </summary>
     public static string? BuildCategorySection(
-        KeyBinding b, string? targetLayerName, HoldTap? holdTap, SignalMacro? signal)
+        KeyBinding b, string? targetLayerName, HoldTap? holdTap)
     {
-        var signalKeycode = signal is not null && signal.TryResolveSignalKeycode(b, out var kc) ? kc : null;
         var layerLabel = targetLayerName ?? "?";
 
         if (holdTap is not null)
-            return BuildHoldTapSection(b, targetLayerName, holdTap, signalKeycode);
-
-        if (signal is not null)
-        {
-            var line = $"Signal macro → {layerLabel}";
-            if (signalKeycode is not null) line += $" (signals {signalKeycode})";
-            return line;
-        }
+            return BuildHoldTapSection(b, targetLayerName, holdTap);
 
         var category = StandardLayerCategory(b);
         return category is null ? null : $"{category} → {layerLabel}";
     }
 
     private static string BuildHoldTapSection(
-        KeyBinding b, string? targetLayerName, HoldTap holdTap, string? signalKeycode)
+        KeyBinding b, string? targetLayerName, HoldTap holdTap)
     {
         var (holdParams, tapParams) = SplitHoldTapParams(b.Params, holdTap);
         var heading = targetLayerName is null ? "Hold-Tap" : $"Hold-Tap → {targetLayerName}";
-        var sigSuffix = signalKeycode is null ? "" : $" (signals {signalKeycode})";
         var holdTail = holdParams.Count > 0 ? " " + string.Join(' ', holdParams) : "";
         var tapTail = tapParams.Count > 0 ? " " + string.Join(' ', tapParams) : "";
-        return $"{heading}\n  Hold: {holdTap.HoldBinding}{holdTail}{sigSuffix}\n  Tap:  {holdTap.TapBinding}{tapTail}";
+        return $"{heading}\n  Hold: {holdTap.HoldBinding}{holdTail}\n  Tap:  {holdTap.TapBinding}{tapTail}";
     }
 
     /// <summary>

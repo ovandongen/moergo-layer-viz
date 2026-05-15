@@ -68,7 +68,6 @@
   <data name="Tooltip_Settings"><value>Instellingen</value></data>
   <data name="Tooltip_Refresh"><value>Layout JSON opnieuw inladen</value></data>
   <data name="Tooltip_LoadLayout"><value>Moergo layout JSON openen…</value></data>
-  <data name="Tooltip_GenerateSignals"><value>Signaalmacro's &amp; hold-taps genereren…</value></data>
   <data name="Tooltip_Keyboard"><value>Toetsenbord</value></data>
   <data name="Tooltip_StackedLayout"><value>Gestapelde indeling wisselen</value></data>
 
@@ -76,7 +75,6 @@
   <data name="Status_NoLayoutLoaded"><value>Geen layout geladen — klik op het mappictogram om een Moergo JSON te openen</value></data>
   <data name="Status_Loaded"><value>Geladen: {0} ({1} lagen)</value></data>
   <data name="Status_LoadErrorFormat"><value>Laden mislukt: {0}</value></data>
-  <data name="Status_UntrackableLayersFormat"><value>{0} ongevolgde laagwissels (vereisen signaalmacro's)</value></data>
   <data name="Status_DiagnosticsCopied"><value>Diagnose naar klembord gekopieerd</value></data>
   <data name="Status_KeyboardSwitched"><value>Toetsenbord gewisseld naar {0}</value></data>
   <data name="Status_KeyboardSwitchedUnloaded"><value>Toetsenbord gewisseld naar {0} — laad de layout opnieuw</value></data>
@@ -88,32 +86,6 @@
 
   <data name="LoadDialog_Title"><value>Moergo layout JSON openen</value></data>
   <data name="LoadDialog_FileType"><value>Moergo layout JSON</value></data>
-  <data name="GenerateSaveDialog_Title"><value>Layout met gegenereerde macro's opslaan</value></data>
-
-  <data name="Title_GenerateSignals"><value>Signaalmacro's &amp; hold-taps genereren</value></data>
-  <data name="Generate_Heading"><value>Signaalmacro's &amp; hold-taps genereren</value></data>
-  <data name="Generate_Description"><value>Voegt parametrische &amp;Tolayer / &amp;Molayer macro's toe, één vaste &amp;mo_&lt;laag&gt;_f&lt;NN&gt;signal macro per geselecteerde laag, en een bijbehorende &amp;ht_&lt;laag&gt; hold-tap per laag. Bestaande items met dezelfde naam worden overgeslagen, en je toetsindeling wordt niet aangepast.</value></data>
-  <data name="Generate_LoadedLayout"><value>Geladen layout</value></data>
-  <data name="Generate_NoLayoutLoaded"><value>(geen layout geladen)</value></data>
-  <data name="Generate_LayersHeading"><value>Lagen waarvoor signalen gegenereerd worden</value></data>
-  <data name="Generate_LayersHint"><value>Kies de lagen die je wilt volgen. Geselecteerde lagen worden achtereenvolgens op Fkeys vanaf de waarde hieronder geplaatst — handig als je meer dan 12 lagen hebt en alleen F13–F24 beschikbaar zijn.</value></data>
-  <data name="Generate_SelectAll"><value>Alles selecteren</value></data>
-  <data name="Generate_ClearAll"><value>Wissen</value></data>
-  <data name="Generate_LayerOutOfRange"><value>—</value></data>
-  <data name="Generate_StartFkey"><value>Begin-Fkey (F13–F24)</value></data>
-  <data name="Generate_StartFkeyHint"><value>De eerste geselecteerde laag krijgt deze Fkey, de volgende start+1, enzovoort. F13–F24 worden door de meeste OS'en niet gebruikt en botsen niet met normaal typen.</value></data>
-  <data name="Generate_Button"><value>Genereren &amp; opslaan…</value></data>
-  <data name="Generate_StatusFkeyRange"><value>Begin-Fkey moet tussen F{0} en F{1} liggen.</value></data>
-  <data name="Generate_StatusReadFailed"><value>Kon de geladen layout niet lezen: {0}</value></data>
-  <data name="Generate_StatusGenerateFailed"><value>Genereren mislukt: {0}</value></data>
-  <data name="Generate_StatusWriteFailed"><value>Kon uitvoerbestand niet schrijven: {0}</value></data>
-  <data name="Generate_StatusSuccess"><value>{0} items toegevoegd → {1}</value></data>
-  <data name="Generate_ResultsHeading"><value>Resultaat</value></data>
-  <data name="Generate_Added"><value>Toegevoegd</value></data>
-  <data name="Generate_Skipped"><value>Overgeslagen (al aanwezig)</value></data>
-  <data name="Generate_Warnings"><value>Waarschuwingen</value></data>
-  <data name="Generate_NextSteps"><value>Volgende stappen in de Moergo-editor</value></data>
-  <data name="Generate_NextStepsBody"><value>1. Importeer de opgeslagen JSON in de Moergo layout-editor.&#10;2. Sleep &amp;ht_&lt;laag&gt; op de toetsen die je voor momentane laagwissel op vasthouden wilt gebruiken (één tap-toetscode-parameter per binding).&#10;3. Of gebruik &amp;Tolayer &lt;laag&gt; &lt;Fkey&gt; / &amp;Molayer &lt;laag&gt; &lt;Fkey&gt; rechtstreeks voor een parametrische wissel op een willekeurige toets.&#10;4. Bouw en flash. De auto-laagwissel van de visualizer volgt de nieuwe bindingen automatisch.</value></data>
 
   <data name="Settings_BackgroundOpacity"><value>Achtergrondopaciteit</value></data>
   <data name="Settings_BackgroundOpacityHint"><value>Hoe dicht de donkere vulling achter het toetsenbord is — zet op 0 voor een volledig transparante overlay.</value></data>
@@ -159,18 +131,10 @@
   <data name="Settings_AutoSwitch_SectionExitKey"><value>Ontsnap-toets</value></data>
   <data name="Settings_AutoSwitch_SectionRules"><value>Regels</value></data>
   <data name="Settings_LayersFormat"><value>Lagen — {0}</value></data>
-  <data name="Settings_LayersHint"><value>Pas per laag de kleur en signaaltoets aan. Lagen met een automatisch herkende signaalmacro tonen de keycode alleen-lezen; voor de overige kies je handmatig een F-toets zodat live tracking de laag kan volgen.</value></data>
+  <data name="Settings_LayersHint"><value>Pas per laag de weergavekleur aan.</value></data>
   <data name="Settings_LayerColorsReset"><value>Terugzetten</value></data>
-  <data name="Settings_LayerSignalsAutoFormat"><value>{0} (auto)</value></data>
-  <data name="Settings_LayerSignalsNone"><value>(geen)</value></data>
   <data name="Settings_Layout"><value>Indeling</value></data>
   <data name="Settings_TopHand"><value>Bovenste helft</value></data>
-  <data name="Settings_LayerSource"><value>Laagbron</value></data>
-  <data name="Settings_LayerSourceHint"><value>Hoe de app laagwissels detecteert. Auto kiest Raw HID (door de firmware gemeld, geen signaalmacro's nodig) wanneer een HID-toetsenbord verbonden is en valt anders terug op signaalmacro's via de OS-toetsenbordhook.</value></data>
-  <data name="Settings_LayerSource_Auto"><value>Auto (voorkeur Raw HID)</value></data>
-  <data name="Settings_LayerSource_RawHid"><value>Alleen Raw HID</value></data>
-  <data name="Settings_LayerSource_SharpHook"><value>Alleen signaalmacro's</value></data>
-  <data name="Status_LayerSourceHintFormat"><value>via {0}</value></data>
   <data name="Settings_CheckForUpdates"><value>Controleer op updates</value></data>
   <data name="Settings_Checking"><value>Bezig met controleren…</value></data>
   <data name="Settings_UpToDate"><value>Je gebruikt de nieuwste versie.</value></data>
@@ -178,7 +142,7 @@
   <data name="Settings_UpdateCheckFailed"><value>Kon niet controleren op updates.</value></data>
 
   <data name="Accessibility_Title"><value>Toegankelijkheidsrechten vereist</value></data>
-  <data name="Accessibility_Body"><value>Moergo Layer Viz heeft toegankelijkheidsrechten nodig om het toetsenbord te volgen voor laagwissel-signaalsleutels. Verleen toegang via Systeeminstellingen → Privacy &amp; Beveiliging → Toegankelijkheid en herstart de app.</value></data>
+  <data name="Accessibility_Body"><value>Moergo Layer Viz heeft toegankelijkheidsrechten nodig om toetsaanslagen voor de globale toon/verberg-sneltoets te volgen. Verleen toegang via Systeeminstellingen → Privacy &amp; Beveiliging → Toegankelijkheid en herstart de app.</value></data>
   <data name="Accessibility_OpenSettings"><value>Systeeminstellingen openen</value></data>
   <data name="Accessibility_Dismiss"><value>Sluiten</value></data>
 </root>

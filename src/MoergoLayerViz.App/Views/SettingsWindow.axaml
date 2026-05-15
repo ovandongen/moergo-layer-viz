@@ -130,37 +130,12 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <Border Height="1" Background="{StaticResource BgSurface0}" />
-
-                    <!-- Layer source: picks how the app learns about layer changes.
-                         Auto = prefer Raw HID (firmware-reported) when available,
-                         fall back to SharpHook + signal macros otherwise. -->
-                    <StackPanel Spacing="6">
-                        <TextBlock Text="{Binding [Settings_LayerSource], Source={StaticResource Loc}}"
-                                   FontSize="14" FontWeight="SemiBold" Foreground="{StaticResource Text}" />
-                        <TextBlock Text="{Binding [Settings_LayerSourceHint], Source={StaticResource Loc}}"
-                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
-                        <ComboBox MinWidth="180" Margin="0,4,0,0"
-                                  HorizontalAlignment="Left"
-                                  ItemsSource="{Binding LayerSourceChoices}"
-                                  SelectedItem="{Binding SelectedLayerSourceChoice, Mode=TwoWay}">
-                            <ComboBox.ItemTemplate>
-                                <DataTemplate>
-                                    <TextBlock Text="{Binding Label}" />
-                                </DataTemplate>
-                            </ComboBox.ItemTemplate>
-                        </ComboBox>
-                        <TextBlock Text="{Binding LayerSourceStatus}"
-                                   Foreground="{StaticResource TextSubtle}" FontSize="11" Margin="0,2,0,0" />
-                    </StackPanel>
-
                 </StackPanel>
             </ScrollViewer>
         </TabItem>
 
-        <!-- Layers tab: per-loaded-layer color override + signal-key picker on
-             one row each. Rebuilds when the layout loads or active keyboard
-             profile changes. -->
+        <!-- Layers tab: per-loaded-layer color override on one row each.
+             Rebuilds when the layout loads or active keyboard profile changes. -->
         <TabItem Header="{Binding [Settings_Tab_Layers], Source={StaticResource Loc}}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="20" Spacing="12">
@@ -174,7 +149,7 @@
                                   IsVisible="{Binding HasLayoutForLayers}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:LayerSettingsEntry">
-                                <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,3,0,3">
+                                <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,3,0,3">
                                     <TextBlock Grid.Column="0"
                                                Text="{Binding DisplayName}"
                                                Foreground="{StaticResource Text}"
@@ -198,25 +173,6 @@
                                             Padding="8,2"
                                             Content="{Binding [Settings_LayerColorsReset], Source={StaticResource Loc}}"
                                             Command="{Binding Color.ResetCommand}" />
-
-                                    <!-- Signal key: auto-detected label OR manual picker (mutually exclusive). -->
-                                    <Grid Grid.Column="3" Margin="12,0,0,0" MinWidth="140">
-                                        <TextBlock Text="{Binding Signal.AutoDisplayText}"
-                                                   Foreground="{StaticResource AccentGreen}"
-                                                   FontSize="12"
-                                                   VerticalAlignment="Center"
-                                                   IsVisible="{Binding Signal.IsAutoDetected}" />
-                                        <ComboBox MinWidth="120"
-                                                  ItemsSource="{Binding Signal.AvailableChoices}"
-                                                  SelectedItem="{Binding Signal.SelectedChoice, Mode=TwoWay}"
-                                                  IsVisible="{Binding Signal.IsManualEditable}">
-                                            <ComboBox.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:LayerSignalChoice">
-                                                    <TextBlock Text="{Binding DisplayName}" />
-                                                </DataTemplate>
-                                            </ComboBox.ItemTemplate>
-                                        </ComboBox>
-                                    </Grid>
                                 </Grid>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
@@ -227,8 +183,8 @@
         </TabItem>
 
         <!-- Auto-switch tab: per-keyboard rules mapping focused app → ZMK layer.
-             Pushing layers to firmware requires the Raw HID source — when the
-             app is tracking via signal macros, the tab is hidden entirely. -->
+             Pushing layers to firmware needs the Raw HID source connected; the
+             tab is hidden while we're still searching for the keyboard. -->
         <TabItem Header="{Binding [Settings_Tab_AutoSwitch], Source={StaticResource Loc}}"
                  IsVisible="{Binding MainViewModel.IsHidSourceActive}">
             <ScrollViewer VerticalScrollBarVisibility="Auto">

@@ -49,7 +49,6 @@
         <SolidColorBrush x:Key="KeyDefaultFill" Color="#F2F2F2" />
         <SolidColorBrush x:Key="KeyStroke" Color="#B0B0B0" />
         <SolidColorBrush x:Key="KeyLayerFill" Color="#1F8B4C" />
-        <SolidColorBrush x:Key="KeyUntrackableStroke" Color="#E64980" />
 
         <!-- Combo indicator -->
         <SolidColorBrush x:Key="ComboFill" Color="#4DABF7" />

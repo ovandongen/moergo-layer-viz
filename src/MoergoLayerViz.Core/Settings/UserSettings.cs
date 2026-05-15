@@ -37,14 +37,6 @@ public record UserSettings
     /// </summary>
     public Dictionary<string, Dictionary<int, string>> LayerColors { get; init; } = new();
 
-    /// <summary>
-    /// User-assigned signal keycodes for layers that have no auto-detected
-    /// signal macro. Outer key = profile id, inner key = layer index, value =
-    /// ZMK keycode (e.g. "F17"). Auto-detected mappings always take precedence;
-    /// entries here for layers with an auto mapping are silently ignored.
-    /// </summary>
-    public Dictionary<string, Dictionary<int, string>> ManualLayerSignals { get; init; } = new();
-
     /// <summary>Whether the window stays on top of other windows.</summary>
     public bool AlwaysOnTop { get; init; } = true;
 

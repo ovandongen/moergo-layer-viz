@@ -6,7 +6,7 @@ namespace MoergoLayerViz.Core.Keymap;
 /// Translates ZMK binding params (keycodes + modifier wrappers) into the
 /// (modifier-set, base-keycode) pair the host OS will see when the key
 /// fires. Pure functions; no state. Used by the highlight-lookup pipeline
-/// to align "what the firmware emits" with "what SharpHook reports".
+/// to align "what the firmware emits" with "what the OS reports".
 /// </summary>
 public static class ZmkKeycodeMapper
 {
@@ -18,16 +18,10 @@ public static class ZmkKeycodeMapper
     /// last position. We also fold in the implicit Shift that ZMK's
     /// shifted-symbol aliases carry (LPAR, STAR, ...).
     /// </summary>
-    public static (HashSet<string> Mods, string Code)? ExtractEmittedKeypress(KeyBinding b, SignalMacro? signal)
+    public static (HashSet<string> Mods, string Code)? ExtractEmittedKeypress(KeyBinding b)
     {
         int startIndex;
-        if (signal is not null
-            && signal.KeyParamIndex is int keyParamIdx
-            && b.Params.Count > keyParamIdx)
-        {
-            startIndex = keyParamIdx;
-        }
-        else switch (b.Behavior)
+        switch (b.Behavior)
         {
             case "&kp" when b.Params.Count >= 1: startIndex = 0; break;
             case "&lt" when b.Params.Count >= 2: startIndex = 1; break;
@@ -102,9 +96,9 @@ public static class ZmkKeycodeMapper
     }
 
     /// <summary>
-    /// Long-form ZMK aliases mapping to the short canonical form that
-    /// <c>SharpHookKeyEventSource</c> emits (EQUALS→EQUAL, LEFT_SHIFT→LSHFT).
-    /// Pure renames; do not change the modifier set.
+    /// Long-form ZMK aliases mapping to the short canonical form
+    /// (EQUALS→EQUAL, LEFT_SHIFT→LSHFT). Pure renames; do not change the
+    /// modifier set.
     /// </summary>
     private static readonly Dictionary<string, string> ZmkPlainAliases = new(StringComparer.Ordinal)
     {

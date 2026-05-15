@@ -60,4 +60,5 @@ publish/
 # Project planning notes (kept local, not published)
 docs/plan.md
 docs/hidplan.md
+docs/hid-only-refactor-plan.md
 CLAUDE.md

@@ -36,18 +36,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private IKeyboardProfile _profile;
     private KeyboardConfig? _config;
-    private IReadOnlyList<SignalMacro> _signalMacros = Array.Empty<SignalMacro>();
-    // Auto + user-manual layer-signal mappings. The live tracker uses the
-    // merged view; the keymap renderer uses the auto-only view so manual
-    // mappings never affect how labels are drawn.
-    private readonly MergedSignalTableManager _signalManager;
-    private IReadOnlyList<UntrackableLayerSwitch> _untrackable = Array.Empty<UntrackableLayerSwitch>();
     private string? _loadedLayoutPath;
     private string? _lastLoadError;
-    // Last successful load's status text *without* the dynamic untrackable
-    // suffix. Kept so we can recompose StatusMessage when the active layer
-    // source flips (HID makes the untrackable warning irrelevant). Null when
-    // the current StatusMessage is something else (error, transient, etc).
+    // Last successful load's status text. Null when the current StatusMessage
+    // is something else (error, transient, etc).
     private string? _loadStatusBase;
 
     // Resolves &trans fall-through via a precomputed predecessor graph.
@@ -55,12 +47,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     // is loaded (callers treat that as "every binding is Transparent").
     private LayerBindingResolver? _bindingResolver;
 
-    private IKeyEventSource? _keyEventSource;
-    private HotkeyLayerTracker? _tracker;
     private LayerSourceCoordinator? _layerCoordinator;
     private CommandSender? _commandSender;
     private LayerStateTracker? _layerStateTracker;
-    private string _layerSourceMode = LayerSourceCoordinator.ModeAuto;
 
     // Press-highlight pipeline: per-layer (mod-set + keycode) → KeyViewModel
     // lookup, held-modifier set, modifier-grace deferral, per-key pulse.
@@ -76,18 +65,16 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public string StatusMessageFull => $"{StatusMessage}  ·  {KeyboardStatusHint}";
 
     /// <summary>
-    /// Suffix appended to the keyboard status hint describing the active layer
-    /// source ("via Raw HID (Go60 Left)" / "via signal macros"). Empty until
-    /// the coordinator has resolved a source.
+    /// Suffix appended to the keyboard status hint describing the HID source
+    /// state ("via Raw HID (Go60 Left)"). Empty until the coordinator has a
+    /// connected source.
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KeyboardStatusHint))]
     [NotifyPropertyChangedFor(nameof(StatusMessageFull))]
     private string _layerSourceHint = "";
 
-    /// <summary>True while the HID source is the active layer source. Used by
-    /// the renderer to hide pink "untrackable" overlays since every layer
-    /// switch is reported by HID.</summary>
+    /// <summary>True while the HID source is connected.</summary>
     [ObservableProperty] private bool _isHidSourceActive;
     [ObservableProperty] private bool _isAlwaysOnTop;
     [ObservableProperty] private bool _isLiveHighlightingEnabled;
@@ -169,8 +156,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// Global show/hide hotkey keycode (e.g. "F12"). Modifier handling lives
     /// in <see cref="UserSettings.HotkeyModifiers"/> and isn't user-editable
     /// today. Changing this raises <see cref="HotkeyKeyChanged"/> so the live
-    /// <c>GlobalHotkeyService</c> rewires without restart, and bumps the
-    /// signal-picker rebuild so the new hotkey is excluded from candidates.
+    /// <c>GlobalHotkeyService</c> rewires without restart.
     /// </summary>
     [ObservableProperty]
     private string _hotkeyKey = "F12";
@@ -179,8 +165,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         PersistSetting(s => s with { HotkeyKey = value });
         HotkeyKeyChanged?.Invoke(value);
-        // Same channel SettingsViewModel listens to for layer-signal picker rebuilds.
-        ManualLayerSignalsChanged?.Invoke();
     }
 
     public event Action<string>? HotkeyKeyChanged;
@@ -225,40 +209,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // Repaint tab swatches in place (re-creating Layers would steal selection focus).
         foreach (var layer in Layers)
             layer.TabColor = LayerColorPalette.GetColor(profileId, layer.Index);
-        // Re-resolve every key's fill — &lt / &mo / signal-macro keys reference
-        // arbitrary layer colors, so changing layer 2's tint repaints layer 0's view too.
+        // Re-resolve every key's fill — &lt / &mo keys reference arbitrary
+        // layer colors, so changing layer 2's tint repaints layer 0's view too.
         if (_config is not null)
             ApplyActiveLayer(ActiveLayerIndex);
         OnPropertyChanged(nameof(ActiveLayerTintColor));
     }
-
-    /// <inheritdoc cref="MergedSignalTableManager.GetAutoSignalKeycodeForLayer"/>
-    public string? GetAutoSignalKeycodeForLayer(int layerIndex) =>
-        _signalManager.GetAutoSignalKeycodeForLayer(layerIndex);
-
-    /// <inheritdoc cref="MergedSignalTableManager.GetManualSignalKeycodeForLayer"/>
-    public string? GetManualSignalKeycodeForLayer(int layerIndex) =>
-        _signalManager.GetManualSignalKeycodeForLayer(layerIndex);
-
-    /// <summary>
-    /// All signal keycodes the live tracker currently considers — auto plus
-    /// active manual mappings. Diagnostic surface for the Settings list to
-    /// compute "which F-keys are still free".
-    /// </summary>
-    public IReadOnlyDictionary<string, SignalKeyMapping> EffectiveSignalMappings =>
-        _signalManager.MergedTable.Mappings;
-
-    /// <inheritdoc cref="MergedSignalTableManager.SetManualLayerSignal"/>
-    public void SetManualLayerSignal(int layerIndex, string? keycode) =>
-        _signalManager.SetManualLayerSignal(layerIndex, keycode);
-
-    /// <summary>
-    /// Raised after the merged signal table is rebuilt. SettingsViewModel
-    /// listens to refresh the per-layer picker rows when (a) a layout loads,
-    /// (b) the keyboard profile changes, or (c) the user toggles a manual
-    /// binding (which can free or claim an F-key for other layers).
-    /// </summary>
-    public event Action? ManualLayerSignalsChanged;
 
     public ObservableCollection<KeyViewModel> Keys { get; } = new();
     /// <summary>Left-hand subset of <see cref="Keys"/>. Bound separately so the stacked-layout renderer can translate the half independently.</summary>
@@ -376,12 +332,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public Func<Task>? CopyDiagnosticsRequested { get; set; }
     public Action? ShowAccessibilityPromptRequested { get; set; }
     public Action? OpenSettingsRequested { get; set; }
-    public Action? OpenGenerateSignalsRequested { get; set; }
 
     /// <summary>Path of the layout JSON the user currently has loaded, or null if none.</summary>
     public string? LoadedLayoutPath => _loadedLayoutPath;
-
-    private bool _accessibilityDialogShown;
 
     // --- Commands ---
     public IRelayCommand QuitCommand { get; }
@@ -396,9 +349,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public IRelayCommand<IKeyboardProfile> SelectKeyboardCommand { get; }
     public IRelayCommand DismissToastCommand { get; }
     public IRelayCommand OpenSettingsCommand { get; }
-    public IRelayCommand OpenGenerateSignalsCommand { get; }
 
-    private readonly SharpHookProvider? _hookProvider;
     private readonly IActiveWindowMonitor? _activeWindowMonitor;
 
     /// <summary>
@@ -449,7 +400,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         IActiveWindowMonitor? activeWindowMonitor = null)
     {
         _settingsService = settingsService;
-        _hookProvider = hookProvider;
         _activeWindowMonitor = activeWindowMonitor;
         var s = settingsService.Load();
         _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new Go60Profile();
@@ -464,20 +414,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             _hotkeyKey = s.HotkeyKey;
         _isStackedLayout = s.StackedLayout;
         _stackedTopHand = string.IsNullOrWhiteSpace(s.StackedTopHand) ? "Left" : s.StackedTopHand;
-        _layerSourceMode = string.IsNullOrWhiteSpace(s.LayerSource) ? LayerSourceCoordinator.ModeAuto : s.LayerSource;
         // Seed the static palette with persisted per-keyboard, per-layer overrides
         // so the very first paint already reflects the user's customization.
         LayerColorPalette.SetOverrides(s.LayerColors);
-
-        // Merged signal-table manager. Owns the auto + manual layer-signal
-        // mappings; we push the merged table into the live tracker (if one
-        // exists) and bump the settings picker on every rebuild.
-        _signalManager = new MergedSignalTableManager(settingsService, _profile.Id);
-        _signalManager.MergedTableChanged += merged =>
-        {
-            _tracker?.UpdateTable(merged);
-            ManualLayerSignalsChanged?.Invoke();
-        };
 
         // Auto-app→layer engine. Owns rule list, session state, exit-tap
         // detector, and the active-window monitor subscription. Engine fires
@@ -552,7 +491,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         SelectKeyboardCommand = new RelayCommand<IKeyboardProfile>(SelectKeyboard);
         DismissToastCommand = new RelayCommand(DismissToast);
         OpenSettingsCommand = new RelayCommand(() => OpenSettingsRequested?.Invoke());
-        OpenGenerateSignalsCommand = new RelayCommand(() => OpenGenerateSignalsRequested?.Invoke());
 
         BuildKeysFromProfile();
     }
@@ -574,9 +512,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             StatusMessage = Loc.Instance["Status_NoLayoutLoaded"];
         }
 
-        // Live tracking is no longer Linux-blocked: the HID source works
-        // without any global hook, and StartKeyEventTracking() internally
-        // skips SharpHook when _hookProvider is null (which it is on Linux).
         if (IsLiveHighlightingEnabled)
             StartKeyEventTracking();
     }
@@ -615,10 +550,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             }
 
             _config = config;
-            _signalMacros = SignalMacroScanner.DetectSignalMacros(config);
-            _untrackable = SignalMacroScanner.FindUntrackableLayerSwitches(config, _signalMacros);
-            _bindingResolver = new LayerBindingResolver(config, _signalMacros);
-            _signalManager.SetAutoTable(LayerSignalTable.Build(config, _signalMacros));
+            _bindingResolver = new LayerBindingResolver(config);
 
             RebuildLayers();
             ApplyActiveLayer(0);
@@ -645,9 +577,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                     bindingCount, _profile.DisplayName, _profile.KeyCount);
             }
             _loadStatusBase = baseMsg;
-            StatusMessage = ComposeLoadStatus();
-            DiagnosticLog.Info("MainVM",
-                $"Loaded '{path}' signalMacros={_signalMacros.Count} untrackable={_untrackable.Count}");
+            StatusMessage = baseMsg;
+            DiagnosticLog.Info("MainVM", $"Loaded '{path}'");
         }
         catch (Exception ex)
         {
@@ -700,8 +631,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     /// <summary>
     /// Builds a snapshot of runtime state (active settings, loaded layout,
-    /// signal-macro count, untrackable layer-switch list, last load error)
-    /// for inclusion in <see cref="DiagnosticLog.CollectDiagnosticReport"/>.
+    /// last load error) for inclusion in
+    /// <see cref="DiagnosticLog.CollectDiagnosticReport"/>.
     /// </summary>
     public string BuildDiagnosticsSnapshot()
     {
@@ -723,16 +654,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         sb.AppendLine($"Profile: {_profile.DisplayName} ({_profile.Id}), {_profile.KeyCount} keys");
         sb.AppendLine($"Loaded layout: {_loadedLayoutPath ?? "(none)"}");
         sb.AppendLine($"Last load error: {_lastLoadError ?? "(none)"}");
-        sb.AppendLine($"Signal macros detected: {_signalMacros.Count}");
-        sb.AppendLine($"Untrackable layer switches: {_untrackable.Count}");
-        if (_untrackable.Count > 0)
-        {
-            foreach (var u in _untrackable)
-            {
-                var target = u.TargetLayer is int t ? t.ToString() : "?";
-                sb.AppendLine($"  (layer {u.LayerIndex}, key index {u.KeyIndex}) {u.Behavior} {target}");
-            }
-        }
 
         return sb.ToString();
     }
@@ -802,7 +723,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         SelectedKeyboard = profile;
         BuildKeysFromProfile();
         _autoSwitch.SetActiveProfile(profile);
-        _signalManager.SetActiveProfile(profile.Id);
 
         var layoutFits = _config is not null
             && _config.LayerCount > 0
@@ -811,10 +731,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         if (_config is not null && !layoutFits)
         {
             _config = null;
-            _signalMacros = Array.Empty<SignalMacro>();
-            _untrackable = Array.Empty<UntrackableLayerSwitch>();
             _bindingResolver = null;
-            _signalManager.SetAutoTable(new LayerSignalTable(new Dictionary<string, SignalKeyMapping>()));
             Layers.Clear();
             ActiveLayerIndex = 0;
             HasLayoutLoaded = false;
@@ -938,11 +855,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         ActiveLayerIndex = index;
         var layer = _config.Layers[index];
 
-        // Includes hold-tap names whose hold side is a signal macro, so an
-        // &ht_* layer binding resolves to its underlying SignalMacro.
-        var signalByName = LayerSignalTable.BuildSignalLookup(_config, _signalMacros);
         var holdTapByName = _config.HoldTaps.ToDictionary(h => h.Name, StringComparer.Ordinal);
-        var untrackableSet = new HashSet<(int layer, int key)>(_untrackable.Select(u => (u.LayerIndex, u.KeyIndex)));
 
         var combosByKey = new Dictionary<int, List<MoergoCombo>>();
         foreach (var combo in _config.Combos)
@@ -963,23 +876,17 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             // (recursively) until a non-transparent binding is found.
             var binding = _bindingResolver?.ResolveEffectiveBinding(layer.Index, i) ?? KeyBinding.Transparent;
 
-            var isSignal = signalByName.TryGetValue(binding.Behavior, out var signalMacro);
             holdTapByName.TryGetValue(binding.Behavior, out var holdTap);
-            var targetLayer = LayerBindingResolver.ResolveTargetLayer(binding, isSignal ? signalMacro : null, holdTap);
+            var targetLayer = LayerBindingResolver.ResolveTargetLayer(binding, holdTap);
             var targetLayerName = targetLayer is int tl && tl >= 0 && tl < _config.Layers.Count
                 ? _config.Layers[tl].Name
                 : null;
             Keys[i].ApplyBinding(
                 binding,
-                isSignalMacro: isSignal,
-                // HID source reports every layer change directly, so the
-                // pink "untrackable" warning is meaningless when it's active.
-                isUntrackable: !IsHidSourceActive && untrackableSet.Contains((layer.Index, i)),
                 targetLayer: targetLayer,
                 targetLayerName: targetLayerName,
                 profileId: _profile.Id,
-                holdTap: holdTap,
-                signal: isSignal ? signalMacro : null);
+                holdTap: holdTap);
         }
 
         // Second pass — every key's label is now settled, so combo participants
@@ -993,8 +900,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
         for (int i = 0; i < Layers.Count; i++)
             Layers[i].IsSelected = Layers[i].Index == index;
-
-        HighlightTracker.Rebuild(_config, _bindingResolver, signalByName);
     }
 
     /// <summary>
@@ -1003,7 +908,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// <see cref="BuildKeysFromProfile"/> has populated it.
     /// </summary>
     private KeyHighlightTracker HighlightTracker =>
-        _highlightTracker ??= new KeyHighlightTracker(Keys, () => ActiveLayerIndex, () => IsHidSourceActive);
+        _highlightTracker ??= new KeyHighlightTracker(Keys);
 
 
     private void ToggleLiveHighlighting()
@@ -1020,36 +925,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private void StartKeyEventTracking()
     {
         if (_layerCoordinator is not null) return;
-        // Re-arm the accessibility-prompt latch on every start so a later
-        // failure (perms revoked at runtime, hook restart) can prompt again.
-        _accessibilityDialogShown = false;
 
-        HotkeyLayerTrackerLayerSource? hotkeyWrapper = null;
-        if (_hookProvider is not null)
-        {
-            try
-            {
-                var source = new SharpHookKeyEventSource(_hookProvider);
-                source.HookFailed += OnHookFailed;
-                _keyEventSource = source;
-                _tracker = new HotkeyLayerTracker(_keyEventSource, _signalManager.MergedTable);
-                _tracker.KeyObserved += HighlightTracker.OnHookEvent;
-                _keyEventSource.Start();
-                hotkeyWrapper = new HotkeyLayerTrackerLayerSource(_tracker);
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLog.Error("MainVM", $"SharpHook init failed: {ex.Message}");
-                _keyEventSource?.Dispose();
-                _keyEventSource = null;
-                _tracker = null;
-                hotkeyWrapper = null;
-            }
-        }
-
-        // Raw HID is platform-agnostic and doesn't need accessibility perms,
-        // so it spins up regardless of the SharpHook outcome above. The
-        // matcher scopes discovery to the user's selected keyboard (both
+        // The matcher scopes discovery to the user's selected keyboard (both
         // Moergo boards share VID:PID, so we'd otherwise latch onto whichever
         // is enumerated first). The unified HidApi.Net transport handles
         // Windows/macOS/Linux and USB/BLE in one code path; see
@@ -1060,7 +937,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         hidSource.ReportReceived += _layerStateTracker.OnReport;
         _layerStateTracker.StateChanged += OnLayerStateConfirmed;
 
-        _layerCoordinator = new LayerSourceCoordinator(hidSource, hotkeyWrapper, _layerSourceMode);
+        _layerCoordinator = new LayerSourceCoordinator(hidSource);
         _layerCoordinator.ActiveLayerChanged += OnActiveLayerChanged;
         _layerCoordinator.ActiveKeyPositionEvent += OnKeyPositionFromHid;
         _layerCoordinator.ActiveSourceChanged += OnActiveSourceChanged;
@@ -1068,14 +945,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // Initial label sync — the coordinator may already have settled the
         // active source before our subscription was attached above.
         OnActiveSourceChanged();
-    }
-
-    private void OnHookFailed(Exception ex)
-    {
-        if (!OperatingSystem.IsMacOS()) return;
-        if (_accessibilityDialogShown) return;
-        _accessibilityDialogShown = true;
-        Avalonia.Threading.Dispatcher.UIThread.Post(() => ShowAccessibilityPromptRequested?.Invoke());
     }
 
     private void StopKeyEventTracking()
@@ -1095,16 +964,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             _layerCoordinator.Dispose();
             _layerCoordinator = null;
         }
-        if (_tracker is not null)
-        {
-            _tracker.KeyObserved -= HighlightTracker.OnHookEvent;
-            _tracker.Dispose();
-            _tracker = null;
-        }
-        if (_keyEventSource is SharpHookKeyEventSource sh)
-            sh.HookFailed -= OnHookFailed;
-        _keyEventSource?.Dispose();
-        _keyEventSource = null;
         IsHidSourceActive = false;
         LayerSourceHint = "";
     }
@@ -1122,35 +981,16 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         var label = _layerCoordinator.ActiveSourceLabel;
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            var flipped = IsHidSourceActive != hidActive;
             IsHidSourceActive = hidActive;
             LayerSourceHint = string.IsNullOrEmpty(label)
                 ? ""
                 : Loc.Instance.Format("Status_LayerSourceHintFormat", label);
-            // Pink "untrackable" overlays are gated on !IsHidSourceActive; rebuild
-            // the per-key state so the change takes effect immediately.
-            if (flipped) ApplyActiveLayer(ActiveLayerIndex);
-            // The "N layer switches not tracked" suffix only applies when
-            // SharpHook is the source — HID reports every layer change, so
-            // recompose to drop/restore that suffix on flips.
-            if (flipped && _loadStatusBase is not null)
-                StatusMessage = ComposeLoadStatus();
         });
     }
 
-    private string ComposeLoadStatus()
-    {
-        var s = _loadStatusBase ?? "";
-        if (_untrackable.Count > 0 && !IsHidSourceActive)
-            s += " — " + Loc.Instance.Format("Status_UntrackableLayersFormat", _untrackable.Count);
-        return s;
-    }
-
     /// <summary>
-    /// Press-highlight path for the HID source. Bypasses _zmkLookup entirely
-    /// — the firmware reports the physical matrix position so we go straight
-    /// to <see cref="Keys"/>[position]. No modifier-grace logic needed
-    /// (HID never reports synthesized modifiers as separate events).
+    /// Press-highlight path for the HID source: the firmware reports the
+    /// physical matrix position so we go straight to <see cref="Keys"/>[position].
     /// </summary>
     private void OnKeyPositionFromHid(int position, bool pressed)
     {
@@ -1164,22 +1004,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         HighlightTracker.PulseAt(position);
     }
 
-    /// <summary>Called by SettingsViewModel when the user picks a different layer source mode.</summary>
-    public void SetLayerSourceMode(string mode)
-    {
-        if (string.IsNullOrWhiteSpace(mode)) return;
-        if (mode == _layerSourceMode) return;
-        _layerSourceMode = mode;
-        PersistSetting(s => s with { LayerSource = mode });
-        _layerCoordinator?.SetMode(mode);
-    }
-
-    public string LayerSourceMode => _layerSourceMode;
-
     private void ResetLayerState()
     {
-        _tracker?.Reset();
-        _highlightTracker?.Reset();
         ApplyActiveLayer(0);
     }
 

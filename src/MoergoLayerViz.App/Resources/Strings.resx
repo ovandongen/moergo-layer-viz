@@ -70,7 +70,6 @@
   <data name="Tooltip_Settings"><value>Settings</value></data>
   <data name="Tooltip_Refresh"><value>Reload layout JSON</value></data>
   <data name="Tooltip_LoadLayout"><value>Load Moergo layout JSON…</value></data>
-  <data name="Tooltip_GenerateSignals"><value>Generate signal macros &amp; hold-taps…</value></data>
   <data name="Tooltip_Keyboard"><value>Keyboard</value></data>
   <data name="Tooltip_StackedLayout"><value>Toggle stacked layout</value></data>
 
@@ -79,7 +78,6 @@
   <data name="Status_NoLayoutLoaded"><value>No layout loaded — click the folder icon to open a Moergo JSON export</value></data>
   <data name="Status_Loaded"><value>Loaded {0} ({1} layers)</value></data>
   <data name="Status_LoadErrorFormat"><value>Load failed: {0}</value></data>
-  <data name="Status_UntrackableLayersFormat"><value>{0} untracked layer switches (need signal macros)</value></data>
   <data name="Status_DiagnosticsCopied"><value>Diagnostics copied to clipboard</value></data>
   <data name="Status_KeyboardSwitched"><value>Keyboard switched to {0}</value></data>
   <data name="Status_KeyboardSwitchedUnloaded"><value>Keyboard switched to {0} — reload your layout</value></data>
@@ -93,33 +91,6 @@
   <!-- File picker -->
   <data name="LoadDialog_Title"><value>Open Moergo layout JSON</value></data>
   <data name="LoadDialog_FileType"><value>Moergo layout JSON</value></data>
-  <data name="GenerateSaveDialog_Title"><value>Save layout with generated macros</value></data>
-
-  <!-- Generate signals window -->
-  <data name="Title_GenerateSignals"><value>Generate signal macros &amp; hold-taps</value></data>
-  <data name="Generate_Heading"><value>Generate signal macros &amp; hold-taps</value></data>
-  <data name="Generate_Description"><value>Adds parametric &amp;Tolayer / &amp;Molayer macros, one fixed &amp;mo_&lt;layer&gt;_f&lt;NN&gt;signal macro per selected layer, and a matching &amp;ht_&lt;layer&gt; hold-tap for each. Existing entries with the same name are skipped, and your keybindings are not modified.</value></data>
-  <data name="Generate_LoadedLayout"><value>Loaded layout</value></data>
-  <data name="Generate_NoLayoutLoaded"><value>(no layout loaded)</value></data>
-  <data name="Generate_LayersHeading"><value>Layers to generate signals for</value></data>
-  <data name="Generate_LayersHint"><value>Pick the layers you want to track. Selected layers are packed into Fkeys consecutively starting at the value below — handy when you have more than 12 layers and only F13–F24 are available.</value></data>
-  <data name="Generate_SelectAll"><value>Select all</value></data>
-  <data name="Generate_ClearAll"><value>Clear</value></data>
-  <data name="Generate_LayerOutOfRange"><value>—</value></data>
-  <data name="Generate_StartFkey"><value>Starting Fkey (F13–F24)</value></data>
-  <data name="Generate_StartFkeyHint"><value>The first selected layer is mapped to this Fkey, the next to start+1, and so on. F13–F24 are reserved on most OSes so they won't collide with normal typing.</value></data>
-  <data name="Generate_Button"><value>Generate &amp; save…</value></data>
-  <data name="Generate_StatusFkeyRange"><value>Starting Fkey must be between F{0} and F{1}.</value></data>
-  <data name="Generate_StatusReadFailed"><value>Could not read the loaded layout: {0}</value></data>
-  <data name="Generate_StatusGenerateFailed"><value>Generation failed: {0}</value></data>
-  <data name="Generate_StatusWriteFailed"><value>Could not write output file: {0}</value></data>
-  <data name="Generate_StatusSuccess"><value>Added {0} entries → {1}</value></data>
-  <data name="Generate_ResultsHeading"><value>Result</value></data>
-  <data name="Generate_Added"><value>Added</value></data>
-  <data name="Generate_Skipped"><value>Skipped (already present)</value></data>
-  <data name="Generate_Warnings"><value>Warnings</value></data>
-  <data name="Generate_NextSteps"><value>Next steps in the Moergo editor</value></data>
-  <data name="Generate_NextStepsBody"><value>1. Import the saved JSON into the Moergo layout editor.&#10;2. Drop &amp;ht_&lt;layer&gt; onto the keys you want to use for momentary layer switching on hold (one tap-side keycode parameter per binding).&#10;3. Or use &amp;Tolayer &lt;layer&gt; &lt;Fkey&gt; / &amp;Molayer &lt;layer&gt; &lt;Fkey&gt; directly for a parametric switch on any other key.&#10;4. Build and flash. The visualizer's auto-layer-switch will follow the new bindings automatically.</value></data>
 
   <!-- Settings window -->
   <data name="Settings_BackgroundOpacity"><value>Background opacity</value></data>
@@ -166,18 +137,10 @@
   <data name="Settings_AutoSwitch_SectionExitKey"><value>Exit key</value></data>
   <data name="Settings_AutoSwitch_SectionRules"><value>Rules</value></data>
   <data name="Settings_LayersFormat"><value>Layers — {0}</value></data>
-  <data name="Settings_LayersHint"><value>Customize each layer's color and signal key. Layers with an auto-detected signal macro show the keycode read-only; the rest get a manual F-key picker so live tracking can follow them.</value></data>
+  <data name="Settings_LayersHint"><value>Customize each layer's display color.</value></data>
   <data name="Settings_LayerColorsReset"><value>Reset</value></data>
-  <data name="Settings_LayerSignalsAutoFormat"><value>{0} (auto)</value></data>
-  <data name="Settings_LayerSignalsNone"><value>(none)</value></data>
   <data name="Settings_Layout"><value>Layout</value></data>
   <data name="Settings_TopHand"><value>Top hand</value></data>
-  <data name="Settings_LayerSource"><value>Layer source</value></data>
-  <data name="Settings_LayerSourceHint"><value>How the app learns about layer changes. Auto prefers Raw HID (firmware-reported, no signal macros required) when a HID-enabled board is connected and falls back to signal macros via the OS keyboard hook otherwise.</value></data>
-  <data name="Settings_LayerSource_Auto"><value>Auto (prefer Raw HID)</value></data>
-  <data name="Settings_LayerSource_RawHid"><value>Raw HID only</value></data>
-  <data name="Settings_LayerSource_SharpHook"><value>Signal macros only</value></data>
-  <data name="Status_LayerSourceHintFormat"><value>via {0}</value></data>
   <data name="Settings_CheckForUpdates"><value>Check for updates</value></data>
   <data name="Settings_Checking"><value>Checking…</value></data>
   <data name="Settings_UpToDate"><value>You're on the latest version.</value></data>
@@ -186,7 +149,7 @@
 
   <!-- Accessibility permission prompt (macOS) -->
   <data name="Accessibility_Title"><value>Accessibility permission required</value></data>
-  <data name="Accessibility_Body"><value>Moergo Layer Viz needs Accessibility permission to watch the keyboard for layer-switch signal keys. Grant access in System Settings → Privacy &amp; Security → Accessibility, then restart the app.</value></data>
+  <data name="Accessibility_Body"><value>Moergo Layer Viz needs Accessibility permission to watch keystrokes for the global show/hide hotkey. Grant access in System Settings → Privacy &amp; Security → Accessibility, then restart the app.</value></data>
   <data name="Accessibility_OpenSettings"><value>Open System Settings</value></data>
   <data name="Accessibility_Dismiss"><value>Dismiss</value></data>
 </root>

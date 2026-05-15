@@ -244,53 +244,6 @@ public partial class App : Application
                 settingsWindow.Show(mainWindow);
             };
 
-            // Single non-modal Generate-signals window. Re-clicking the toolbar
-            // button brings the existing window to front rather than spawning
-            // a new one, mirroring the Settings pattern.
-            GenerateSignalsWindow? generateWindow = null;
-            viewModel.OpenGenerateSignalsRequested = () =>
-            {
-                if (generateWindow is { } existing && existing.IsVisible)
-                {
-                    existing.Activate();
-                    return;
-                }
-                var loadedPath = viewModel.LoadedLayoutPath;
-                var generateVm = new GenerateSignalsViewModel(loadedPath);
-                generateVm.SaveFileRequested = async defaultName =>
-                {
-                    Avalonia.Platform.Storage.IStorageFolder? startFolder = null;
-                    var sourceDir = string.IsNullOrEmpty(loadedPath) ? null : Path.GetDirectoryName(loadedPath);
-                    if (!string.IsNullOrEmpty(sourceDir))
-                    {
-                        try { startFolder = await mainWindow.StorageProvider.TryGetFolderFromPathAsync(sourceDir); }
-                        catch { /* fallback to no start location */ }
-                    }
-                    var file = await mainWindow.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-                    {
-                        Title = Loc.Instance["GenerateSaveDialog_Title"],
-                        SuggestedFileName = defaultName,
-                        SuggestedStartLocation = startFolder,
-                        DefaultExtension = "json",
-                        FileTypeChoices =
-                        [
-                            new FilePickerFileType(Loc.Instance["LoadDialog_FileType"])
-                            {
-                                Patterns = ["*.json"],
-                            }
-                        ],
-                    });
-                    return file?.Path.LocalPath;
-                };
-                generateWindow = new GenerateSignalsWindow
-                {
-                    DataContext = generateVm,
-                    Topmost = mainWindow.Topmost,
-                };
-                generateWindow.Closed += (_, _) => generateWindow = null;
-                generateWindow.Show(mainWindow);
-            };
-
             viewModel.CopyDiagnosticsRequested = async () =>
             {
                 try
