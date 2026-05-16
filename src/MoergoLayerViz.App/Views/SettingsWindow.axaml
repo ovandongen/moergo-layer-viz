@@ -439,7 +439,7 @@
         </TabItem>
 
         <!-- Testing tab: temporary scratch area for HID push tests. Remove when done. -->
-        <TabItem Header="Testing">
+        <TabItem Header="Testing" IsVisible="False">
             <ScrollViewer VerticalScrollBarVisibility="Auto">
                 <StackPanel Margin="20" Spacing="12">
                     <TextBlock Text="Push layer to keyboard"

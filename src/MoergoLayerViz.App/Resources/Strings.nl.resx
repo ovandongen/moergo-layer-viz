@@ -80,6 +80,7 @@
   <data name="Status_KeyboardSwitched"><value>Toetsenbord gewisseld naar {0}</value></data>
   <data name="Status_KeyboardSwitchedUnloaded"><value>Toetsenbord gewisseld naar {0} — laad de layout opnieuw</value></data>
   <data name="Status_KeyboardHintFormat"><value>{0} · {1} toetsen</value></data>
+  <data name="Status_LayerSourceHintFormat"><value>via {0}</value></data>
   <data name="Status_LoadKeyCountMismatch"><value>layout heeft {0} toetsen maar {1} verwacht er {2} — wissel toetsenbord of laad een passende JSON</value></data>
   <data name="Status_AutoSwitchedKeyboard"><value>automatisch gewisseld naar {0}</value></data>
 

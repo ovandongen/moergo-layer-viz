@@ -59,12 +59,29 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private KeyHighlightTracker? _highlightTracker;
 
     // --- UI-bindable state ---
+    /// <summary>
+    /// Transient/changing status text shown in the center of the top bar
+    /// ("Switched to GO60", "Load error: …"). The persistent loaded-layout
+    /// info lives in <see cref="LoadInfoTooltip"/>, surfaced via the
+    /// InfoButton's hover tooltip.
+    /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusMessageFull))]
     private string _statusMessage = "";
 
-    /// <summary>Tooltip text for the (often-truncated) status bar — full status + keyboard hint joined.</summary>
-    public string StatusMessageFull => $"{StatusMessage}  ·  {KeyboardStatusHint}";
+    /// <summary>
+    /// Hover tooltip for the InfoButton: persistent "Loaded foo.json (N layers) · keyboard hint",
+    /// or "No layout loaded · keyboard hint" when nothing is loaded.
+    /// </summary>
+    public string LoadInfoTooltip =>
+        $"{_loadStatusBase ?? Loc.Instance["Status_NoLayoutLoaded"]}  ·  {KeyboardStatusHint}";
+
+    // Single write site for _loadStatusBase so the InfoButton tooltip refreshes
+    // whenever the persistent loaded-info changes.
+    private void SetLoadStatusBase(string? value)
+    {
+        _loadStatusBase = value;
+        OnPropertyChanged(nameof(LoadInfoTooltip));
+    }
 
     /// <summary>
     /// Suffix appended to the keyboard status hint describing the HID source
@@ -73,7 +90,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KeyboardStatusHint))]
-    [NotifyPropertyChangedFor(nameof(StatusMessageFull))]
+    [NotifyPropertyChangedFor(nameof(LoadInfoTooltip))]
     private string _layerSourceHint = "";
 
     /// <summary>True while the HID source is connected.</summary>
@@ -355,7 +372,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(KeyboardStatusHint))]
-    [NotifyPropertyChangedFor(nameof(StatusMessageFull))]
+    [NotifyPropertyChangedFor(nameof(LoadInfoTooltip))]
     [NotifyPropertyChangedFor(nameof(ActiveLayerTintColor))]
     private IKeyboardProfile _selectedKeyboard = null!;
 
@@ -581,7 +598,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             }
             catch (Exception ex)
             {
-                _loadStatusBase = null;
+                SetLoadStatusBase(null);
                 StatusMessage = $"Could not open log folder: {ex.Message}";
             }
         });
@@ -609,7 +626,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         }
         else
         {
-            _loadStatusBase = null;
+            SetLoadStatusBase(null);
             StatusMessage = Loc.Instance["Status_NoLayoutLoaded"];
         }
 
@@ -677,13 +694,13 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 baseMsg += " — " + Loc.Instance.Format("Status_LoadKeyCountMismatch",
                     bindingCount, _profile.DisplayName, _profile.KeyCount);
             }
-            _loadStatusBase = baseMsg;
+            SetLoadStatusBase(baseMsg);
             StatusMessage = baseMsg;
             DiagnosticLog.Info("MainVM", $"Loaded '{path}'");
         }
         catch (Exception ex)
         {
-            _loadStatusBase = null;
+            SetLoadStatusBase(null);
             StatusMessage = Loc.Instance.Format("Status_LoadErrorFormat", ex.Message);
             _lastLoadError = $"{path}: {ex.GetType().Name}: {ex.Message}";
             DiagnosticLog.Error("MainVM", $"Load failed: {ex}");
@@ -871,18 +888,18 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             Layers.Clear();
             ActiveLayerIndex = 0;
             HasLayoutLoaded = false;
-            _loadStatusBase = null;
+            SetLoadStatusBase(null);
             StatusMessage = Loc.Instance.Format("Status_KeyboardSwitchedUnloaded", profile.DisplayName);
         }
         else if (_config is not null)
         {
             ApplyActiveLayer(ActiveLayerIndex);
-            _loadStatusBase = null;
+            SetLoadStatusBase(null);
             StatusMessage = Loc.Instance.Format("Status_KeyboardSwitched", profile.DisplayName);
         }
         else
         {
-            _loadStatusBase = null;
+            SetLoadStatusBase(null);
             StatusMessage = Loc.Instance.Format("Status_KeyboardSwitched", profile.DisplayName);
         }
 

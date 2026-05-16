@@ -83,6 +83,7 @@
   <data name="Status_KeyboardSwitched"><value>Keyboard switched to {0}</value></data>
   <data name="Status_KeyboardSwitchedUnloaded"><value>Keyboard switched to {0} — reload your layout</value></data>
   <data name="Status_KeyboardHintFormat"><value>{0} · {1} keys</value></data>
+  <data name="Status_LayerSourceHintFormat"><value>via {0}</value></data>
   <data name="Status_LoadKeyCountMismatch"><value>layout has {0} keys but {1} expects {2} — switch keyboard or load a matching JSON</value></data>
   <data name="Status_AutoSwitchedKeyboard"><value>auto-switched to {0}</value></data>
 

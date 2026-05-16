@@ -84,8 +84,10 @@
                         <PathIcon Width="12" Height="12"
                                   Data="M20 14H4v-2h16v2z" />
                     </Button>
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
-                                HorizontalAlignment="Right" Spacing="4">
+
+                    <!-- Primary controls: keyboard picker, load JSON, info hover. Sit just after the chrome buttons. -->
+                    <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Spacing="4"
+                                VerticalAlignment="Center" Margin="0,0,8,0">
                         <StackPanel.Styles>
                             <Style Selector="StackPanel > Button">
                                 <Setter Property="Focusable" Value="False" />
@@ -141,6 +143,32 @@
                             </Button.Flyout>
                         </Button>
 
+                        <!-- Load layout JSON -->
+                        <Button x:Name="LoadLayoutButton"
+                                Command="{Binding LoadLayoutCommand}"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_LoadLayout], Source={StaticResource Loc}}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
+                        </Button>
+
+                        <!-- Loaded-layout info: icon-only, hover tooltip shows full "Loaded foo.json (N layers) · keyboard hint". -->
+                        <Button x:Name="InfoButton"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding LoadInfoTooltip}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" />
+                        </Button>
+                    </StackPanel>
+
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                                HorizontalAlignment="Right" Spacing="4">
+                        <StackPanel.Styles>
+                            <Style Selector="StackPanel > Button">
+                                <Setter Property="Focusable" Value="False" />
+                            </Style>
+                        </StackPanel.Styles>
+
                         <!-- Live key highlighting — pulses a key cap when the firmware reports a press over HID -->
                         <Button x:Name="LiveButton"
                                 Command="{Binding ToggleLiveHighlightingCommand}"
@@ -172,15 +200,6 @@
                                 ToolTip.Tip="{Binding [Tooltip_ModifierStyle], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
                                       Data="{Binding ModifierStyleIconData}" />
-                        </Button>
-
-                        <!-- Load layout JSON -->
-                        <Button x:Name="LoadLayoutButton"
-                                Command="{Binding LoadLayoutCommand}"
-                                Padding="8,4"
-                                ToolTip.Tip="{Binding [Tooltip_LoadLayout], Source={StaticResource Loc}}">
-                            <PathIcon Width="14" Height="14"
-                                      Data="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z" />
                         </Button>
 
                         <!-- Refresh loaded JSON from disk -->
@@ -227,16 +246,13 @@
                                       Data="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z" />
                         </Button>
                     </StackPanel>
-                    <!-- Fill child: takes remaining space, truncates with ellipsis.
-                         Status message + dim keyboard-profile hint appended on the right. -->
+                    <!-- Fill child: transient/changing status only ("Switched to GO60", "Load error: …").
+                         The persistent loaded-info text lives in the InfoButton tooltip on the left. -->
                     <TextBlock VerticalAlignment="Center"
                                MinWidth="20"
                                TextTrimming="CharacterEllipsis"
-                               ToolTip.Tip="{Binding StatusMessageFull}">
-                        <Run Text="{Binding StatusMessage}" Foreground="{StaticResource Text}" />
-                        <Run Text="  ·  " Foreground="{StaticResource TabHoverBorder}" />
-                        <Run Text="{Binding KeyboardStatusHint}" Foreground="{StaticResource TextStatusBar}" />
-                    </TextBlock>
+                               Text="{Binding StatusMessage}"
+                               Foreground="{StaticResource Text}" />
                 </DockPanel>
             </Border>
 
