@@ -14,9 +14,7 @@ using MoergoLayerViz.Core.Layout;
 using MoergoLayerViz.Core.Models;
 using MoergoLayerViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
-using ZmkHidProtocol.Building;
 using ZmkHidProtocol.Protocol;
-using ZmkHidProtocol.Transport;
 
 namespace MoergoLayerViz.App.ViewModels;
 
@@ -49,9 +47,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     // is loaded (callers treat that as "every binding is Transparent").
     private LayerBindingResolver? _bindingResolver;
 
-    private LayerSourceCoordinator? _layerCoordinator;
-    private CommandSender? _commandSender;
-    private LayerStateTracker? _layerStateTracker;
+    private readonly IHidPipeline _hid;
+    private readonly LayerPushCoordinator _push;
 
     // Press-highlight pipeline: per-layer (mod-set + keycode) → KeyViewModel
     // lookup, held-modifier set, modifier-grace deferral, per-key pulse.
@@ -400,58 +397,38 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public IRelayCommand DismissToastCommand { get; }
     public IRelayCommand OpenSettingsCommand { get; }
 
-    private readonly IActiveWindowMonitor? _activeWindowMonitor;
-
-    /// <summary>
-    /// All auto-app→layer state and behaviour. Owns the session record, the
-    /// exit-tap detector, the active-window monitor subscription, the rule
-    /// list, and the matched-rule cache. This VM exposes facade properties
-    /// over the engine so existing XAML bindings and
-    /// <see cref="SettingsViewModel"/> calls keep working unchanged.
-    /// </summary>
-    private readonly AutoSwitchEngine _autoSwitch;
-
-    /// <summary>
-    /// Mouse-movement → layer push engine. Optional: null when the host
-    /// didn't supply an <see cref="IMouseIdleMonitor"/> (e.g. unit tests).
-    /// Owns its own settings load/persist and listens to monitor events.
-    /// HID-connection transitions are pushed in from
-    /// <see cref="OnActiveSourceChanged"/>.
-    /// </summary>
-    private readonly MouseLayerEngine? _mouseLayer;
-
     /// <inheritdoc cref="AutoSwitchEngine.ExitTapKey"/>
-    public int? ExitTapKey => _autoSwitch.ExitTapKey;
+    public int? ExitTapKey => _push.AutoSwitch.ExitTapKey;
 
     /// <inheritdoc cref="AutoSwitchEngine.SetExitTapKey"/>
-    public void SetExitTapKey(int? index) => _autoSwitch.SetExitTapKey(index);
+    public void SetExitTapKey(int? index) => _push.AutoSwitch.SetExitTapKey(index);
 
     /// <inheritdoc cref="AutoSwitchEngine.ActiveWindow"/>
-    public ActiveWindowInfo? ActiveWindow => _autoSwitch.ActiveWindow;
+    public ActiveWindowInfo? ActiveWindow => _push.AutoSwitch.ActiveWindow;
 
     /// <inheritdoc cref="AutoSwitchEngine.AppLayerRules"/>
-    public ObservableCollection<AppLayerRule> AppLayerRules => _autoSwitch.AppLayerRules;
+    public ObservableCollection<AppLayerRule> AppLayerRules => _push.AutoSwitch.AppLayerRules;
 
     /// <inheritdoc cref="AutoSwitchEngine.IsEnabled"/>
     public bool IsAutoSwitchKeyboardLayerEnabled
     {
-        get => _autoSwitch.IsEnabled;
-        set => _autoSwitch.IsEnabled = value;
+        get => _push.AutoSwitch.IsEnabled;
+        set => _push.AutoSwitch.IsEnabled = value;
     }
 
     /// <inheritdoc cref="AutoSwitchEngine.FallbackMode"/>
     public AutoSwitchFallbackMode AutoSwitchFallbackMode
     {
-        get => _autoSwitch.FallbackMode;
-        set => _autoSwitch.FallbackMode = value;
+        get => _push.AutoSwitch.FallbackMode;
+        set => _push.AutoSwitch.FallbackMode = value;
     }
 
     /// <inheritdoc cref="AutoSwitchEngine.MatchedAppLayerRule"/>
-    public AppLayerRule? MatchedAppLayerRule => _autoSwitch.MatchedAppLayerRule;
+    public AppLayerRule? MatchedAppLayerRule => _push.AutoSwitch.MatchedAppLayerRule;
 
     /// <inheritdoc cref="AutoSwitchEngine.ApplyAppLayerRules"/>
     public void ApplyAppLayerRules(IReadOnlyList<AppLayerRule> rules) =>
-        _autoSwitch.ApplyAppLayerRules(rules);
+        _push.AutoSwitch.ApplyAppLayerRules(rules);
 
     /// <summary>
     /// Returns the active profile's mouse-layer settings. Falls back to a
@@ -460,7 +437,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// </summary>
     public MouseLayerSettings GetActiveMouseLayerSettings()
     {
-        if (_mouseLayer is not null) return _mouseLayer.CurrentSettings;
+        if (_push.MouseLayer is not null) return _push.MouseLayer.CurrentSettings;
         var s = _settingsService.Load();
         return s.MouseLayer.TryGetValue(_profile.Id, out var loaded)
             ? loaded
@@ -472,7 +449,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// engine (idle timeout + enabled-state reconciliation).
     /// </summary>
     public void ApplyMouseLayerSettings(MouseLayerSettings settings) =>
-        _mouseLayer?.ApplySettings(settings);
+        _push.MouseLayer?.ApplySettings(settings);
 
     public MainWindowViewModel(
         ISettingsService settingsService,
@@ -480,7 +457,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         IMouseIdleMonitor? mouseIdleMonitor = null)
     {
         _settingsService = settingsService;
-        _activeWindowMonitor = activeWindowMonitor;
         var s = settingsService.Load();
         _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new Go60Profile();
         _selectedKeyboard = _profile;
@@ -504,24 +480,28 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // so the very first paint already reflects the user's customization.
         LayerColorPalette.SetOverrides(s.LayerColors);
 
-        // Auto-app→layer engine. Owns rule list, session state, exit-tap
-        // detector, and the active-window monitor subscription. Engine fires
-        // PushLayerRequested when it wants the host to change layers; we
-        // relay its PropertyChanged events under this VM's property names
-        // so existing XAML bindings keep working unchanged.
-        // AutoSwitch reads "the layer underneath any in-flight mouse-layer
-        // push" so its captured PreRuleLayer (and userOverrode comparison)
-        // never see the transient mouse layer. When no mouse push is active,
-        // PreMoveLayer is null and we fall through to the literal current
-        // layer — which is also the right answer for Cmd+Tab focus changes
-        // that happen without mouse movement.
-        _autoSwitch = new AutoSwitchEngine(
+        // HID stack owns the layer source, command sender, and state tracker.
+        // Constructed eagerly so push surfaces are available before Start();
+        // the underlying RawHidLayerSource doesn't open the device until
+        // Start() runs (triggered by ToggleLiveHighlighting).
+        _hid = new HidPipeline(_profile);
+        _hid.ActiveLayerChanged += OnActiveLayerChanged;
+        _hid.ConnectionChanged += OnActiveSourceChanged;
+
+        // Push coordinator owns AutoSwitch + MouseLayer and the handoff between
+        // them. Routes both engines' pushes through _hid; redirects AutoSwitch
+        // pushes into MouseLayer's revert target while a mouse push is in
+        // flight. Forwards HID key-position events into AutoSwitch's exit-tap
+        // detector and re-raises them for the highlight tracker below.
+        _push = new LayerPushCoordinator(
+            _hid,
+            getRenderedLayer: () => ActiveLayerIndex,
+            _profile,
             settingsService,
             activeWindowMonitor,
-            () => _mouseLayer?.PreMoveLayer ?? ActiveLayerIndex,
-            _profile);
-        _autoSwitch.PushLayerRequested += OnAutoSwitchPushRequested;
-        _autoSwitch.PropertyChanged += (_, e) =>
+            mouseIdleMonitor);
+        _push.KeyPositionForUi += OnKeyPositionForHighlight;
+        _push.AutoSwitch.PropertyChanged += (_, e) =>
         {
             var relay = e.PropertyName switch
             {
@@ -534,20 +514,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             };
             if (relay is not null) OnPropertyChanged(relay);
         };
-
-        // Mouse-movement → layer push engine. Pushes via the same HID command
-        // sink AutoSwitch uses; last-write-wins between the two. Lazily
-        // constructed only when the host wired up a real monitor.
-        if (mouseIdleMonitor is not null)
-        {
-            _mouseLayer = new MouseLayerEngine(
-                settingsService,
-                mouseIdleMonitor,
-                () => ActiveLayerIndex,
-                () => IsHidSourceActive,
-                _profile);
-            _mouseLayer.PushLayerRequested += PushLayerToKeyboard;
-        }
 
         QuitCommand = new RelayCommand(() => QuitRequested?.Invoke());
         ShowCommand = new RelayCommand(() => ShowWindowRequested?.Invoke());
@@ -636,7 +602,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                     BuildKeysFromProfile();
                     PersistSetting(s => s with { Keyboard = matching.Id });
                     // Re-scope HID discovery — see SelectKeyboard for context.
-                    _layerCoordinator?.SetActiveProfile(matching);
+                    _hid.SetActiveProfile(matching);
                     autoSwitchedTo = matching;
                     DiagnosticLog.Info("MainVM",
                         $"Auto-switched profile to {matching.Id} ({bindingCount} keys) on load");
@@ -764,38 +730,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // HID so we don't leave the keyboard pinned to the mouse layer after
         // we're no longer in control. Synchronous + bounded so a stuck HID
         // write can't hang shutdown.
-        if (_mouseLayer?.PreMoveLayer is int revertLayer)
-        {
-            PushLayerToKeyboardSync(revertLayer, TimeSpan.FromMilliseconds(500));
-            _mouseLayer.ClearPushedState();
-        }
+        _push.RevertMouseLayerForShutdown(TimeSpan.FromMilliseconds(500));
         StopKeyEventTracking();
-        _autoSwitch.Shutdown();
-        _mouseLayer?.Dispose();
-    }
-
-    /// <summary>
-    /// Shutdown-only synchronous variant of <see cref="PushLayerToKeyboard"/>.
-    /// Waits up to <paramref name="timeout"/> for the HID write to complete
-    /// before returning, so the caller can tear down the command sender
-    /// without losing the in-flight write.
-    /// </summary>
-    private void PushLayerToKeyboardSync(int index, TimeSpan timeout)
-    {
-        var sender = _commandSender;
-        if (sender is null) return;
-        uint bitmask = 1u << index;
-        _layerStateTracker?.ExpectAppState(bitmask);
-        try
-        {
-            using var cts = new CancellationTokenSource(timeout);
-            sender.SetLayerStateAsync(bitmask, cts.Token).GetAwaiter().GetResult();
-            DiagnosticLog.Info("LayerPush", $"sync sent layer {index} (mask 0x{bitmask:X})");
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.Warn("LayerPush", $"sync layer {index} failed: {ex.Message}");
-        }
+        _push.Shutdown();
+        _push.Dispose();
+        _hid.Dispose();
     }
 
     // --- Internals ---
@@ -855,8 +794,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _profile = profile;
         SelectedKeyboard = profile;
         BuildKeysFromProfile();
-        _autoSwitch.SetActiveProfile(profile);
-        _mouseLayer?.SetActiveProfile(profile);
+        _push.SetActiveProfile(profile);
 
         var layoutFits = _config is not null
             && _config.LayerCount > 0
@@ -890,7 +828,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         // Re-scope HID discovery to the new profile so a Go60 stops feeding
         // reports into a Glove80 layout (or vice versa). No-op when HID is
         // disabled or the source isn't running.
-        _layerCoordinator?.SetActiveProfile(profile);
+        _hid.SetActiveProfile(profile);
 
         // Auto-load whichever JSON the user last associated with this keyboard.
         // If the previously-loaded layout already fits, leave it alone.
@@ -947,25 +885,16 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         ApplyActiveLayer(index);
     }
 
+    /// <summary>Routes a layer push through the HID pipeline. Test-tab plumbing for SettingsViewModel.</summary>
+    public void PushLayerToKeyboard(int index) => _hid.PushLayer(index);
+
     /// <summary>
     /// Sends a 0xFD GetDeviceInfo request and awaits the 0xFE reply.
     /// Returns null when no HID is connected, on timeout, or on transport
     /// failure. Test-tab plumbing only.
     /// </summary>
-    public async Task<DeviceInfo?> QueryDeviceInfoAsync(TimeSpan timeout, CancellationToken ct)
-    {
-        var sender = _commandSender;
-        if (sender is null) return null;
-        try
-        {
-            return await sender.QueryDeviceInfoAsync(timeout, ct);
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.Warn("HidQuery", $"device-info query failed: {ex.Message}");
-            return null;
-        }
-    }
+    public Task<DeviceInfo?> QueryDeviceInfoAsync(TimeSpan timeout, CancellationToken ct) =>
+        _hid.QueryDeviceInfoAsync(timeout, ct);
 
     /// <summary>
     /// Sends a 0xFB GetConfigId request and awaits the 0xFA reply.
@@ -973,67 +902,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// failure. Empty string means the firmware has no
     /// CONFIG_HID_VIZ_CONFIG_ID set. Test-tab plumbing only.
     /// </summary>
-    public async Task<string?> QueryConfigIdAsync(TimeSpan timeout, CancellationToken ct)
-    {
-        var sender = _commandSender;
-        if (sender is null) return null;
-        try
-        {
-            return await sender.QueryConfigIdAsync(timeout, ct);
-        }
-        catch (Exception ex)
-        {
-            DiagnosticLog.Warn("HidQuery", $"config-id query failed: {ex.Message}");
-            return null;
-        }
-    }
-
-    /// <summary>
-    /// AutoSwitch ↔ MouseLayer coordination contract: while the mouse layer
-    /// is actively pushing, redirect the app rule's target into the mouse
-    /// engine's revert layer so the keyboard stays on the mouse layer until
-    /// idle, then lands on the app rule's layer in one transition (no
-    /// flicker, no orphaned mouse push).
-    /// </summary>
-    private void OnAutoSwitchPushRequested(int layer)
-    {
-        if (_mouseLayer?.TryRedirectPendingPush(layer) == true) return;
-        PushLayerToKeyboard(layer);
-    }
-
-    public void PushLayerToKeyboard(int index)
-    {
-        var sender = _commandSender;
-        if (sender is null) return;
-
-        // Firmware keeps layer 0 active regardless; bitmask just names the target.
-        uint bitmask = 1u << index;
-        // Arm before sending so the inbound 0xFF reply can be matched as ours.
-        // LayerStateTracker OR's bit 0 in for the firmware's always-on layer 0.
-        _layerStateTracker?.ExpectAppState(bitmask);
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                await sender.SetLayerStateAsync(bitmask, CancellationToken.None);
-                DiagnosticLog.Info("LayerPush", $"sent layer {index} (mask 0x{bitmask:X})");
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLog.Warn("LayerPush", $"layer {index} failed: {ex.Message}");
-            }
-        });
-    }
-
-    private void OnLayerStateConfirmed(uint bitmask)
-    {
-        var tracker = _layerStateTracker;
-        if (tracker is null) return;
-        if (tracker.IsAppControlled)
-            DiagnosticLog.Info("LayerState", $"app push acknowledged: layer {tracker.HighestActiveLayer} (mask 0x{bitmask:X})");
-        else
-            DiagnosticLog.Info("LayerState", $"external change: layer {tracker.HighestActiveLayer} (mask 0x{bitmask:X})");
-    }
+    public Task<string?> QueryConfigIdAsync(TimeSpan timeout, CancellationToken ct) =>
+        _hid.QueryConfigIdAsync(timeout, ct);
 
     private void ApplyActiveLayer(int index)
     {
@@ -1127,46 +997,21 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private void StartKeyEventTracking()
     {
-        if (_layerCoordinator is not null) return;
-
-        // The matcher scopes discovery to the user's selected keyboard (both
-        // Moergo boards share VID:PID, so we'd otherwise latch onto whichever
-        // is enumerated first). The unified HidApi.Net transport handles
-        // Windows/macOS/Linux and USB/BLE in one code path; see
-        // ZmkHidProtocol's RawHidLayerSource.
-        var (hidSource, hidSink) = LayerSourceFactory.Create(new KeyboardProfileMatcher(_profile));
-        _commandSender = new CommandSender(hidSource, hidSink);
-        _layerStateTracker = new LayerStateTracker();
-        hidSource.ReportReceived += _layerStateTracker.OnReport;
-        _layerStateTracker.StateChanged += OnLayerStateConfirmed;
-
-        _layerCoordinator = new LayerSourceCoordinator(hidSource);
-        _layerCoordinator.ActiveLayerChanged += OnActiveLayerChanged;
-        _layerCoordinator.ActiveKeyPositionEvent += OnKeyPositionFromHid;
-        _layerCoordinator.ActiveSourceChanged += OnActiveSourceChanged;
-        _layerCoordinator.Start();
-        // Initial label sync — the coordinator may already have settled the
-        // active source before our subscription was attached above.
+        _hid.Start();
+        // Initial label sync — the source may already have settled the
+        // active state before our subscription was attached above.
         OnActiveSourceChanged();
     }
 
     private void StopKeyEventTracking()
     {
-        _commandSender?.Dispose();
-        _commandSender = null;
-        if (_layerStateTracker is not null)
-        {
-            _layerStateTracker.StateChanged -= OnLayerStateConfirmed;
-            _layerStateTracker = null;
-        }
-        if (_layerCoordinator is not null)
-        {
-            _layerCoordinator.ActiveLayerChanged -= OnActiveLayerChanged;
-            _layerCoordinator.ActiveKeyPositionEvent -= OnKeyPositionFromHid;
-            _layerCoordinator.ActiveSourceChanged -= OnActiveSourceChanged;
-            _layerCoordinator.Dispose();
-            _layerCoordinator = null;
-        }
+        // Revert any in-flight mouse-layer push *before* tearing down HID.
+        // Otherwise the engine's _preMoveLayer stays set across the stop,
+        // and the next enable captures the (still-held) mouse layer as
+        // the new pre-move layer — getting stuck pushing/reverting onto
+        // the mouse layer.
+        _push.RevertMouseLayerForShutdown(TimeSpan.FromMilliseconds(500));
+        _hid.Stop();
         IsHidSourceActive = false;
         LayerSourceHint = "";
     }
@@ -1179,9 +1024,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private void OnActiveSourceChanged()
     {
-        if (_layerCoordinator is null) return;
-        var hidActive = _layerCoordinator.IsHidActive;
-        var label = _layerCoordinator.ActiveSourceLabel;
+        var hidActive = _hid.IsConnected;
+        var label = _hid.SourceLabel;
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             IsHidSourceActive = hidActive;
@@ -1190,7 +1034,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 : Loc.Instance.Format("Status_LayerSourceHintFormat", label);
             // Mouse-layer engine only fires when HID is connected; toggling
             // it stops the OS-level mouse tap while disconnected.
-            _mouseLayer?.OnHidConnectionChanged();
+            _push.OnHidConnectionChanged();
         });
     }
 
@@ -1198,14 +1042,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// Press-highlight path for the HID source: the firmware reports the
     /// physical matrix position so we go straight to <see cref="Keys"/>[position].
     /// </summary>
-    private void OnKeyPositionFromHid(int position, bool pressed)
+    private void OnKeyPositionForHighlight(int position, bool pressed)
     {
-        // Feed the auto-switch engine's exit-tap detector regardless of
-        // pressed/released — it needs releases to re-arm. Null position
-        // short-circuits inside the detector, so this is free when no
-        // exit key is configured.
-        _autoSwitch.OnKeyPositionEvent(position, pressed);
-
         if (!pressed) return;
         HighlightTracker.PulseAt(position);
     }
