@@ -2,6 +2,7 @@ using System.IO;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Input;
 using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
@@ -266,10 +267,15 @@ public partial class App : Application
                 try
                 {
                     var report = DiagnosticLog.CollectDiagnosticReport(viewModel.BuildDiagnosticsSnapshot());
-                    var clipboard = mainWindow.Clipboard;
+                    var clipboard = TopLevel.GetTopLevel(mainWindow)?.Clipboard ?? mainWindow.Clipboard;
                     if (clipboard is not null)
                     {
-                        await clipboard.SetTextAsync(report);
+                        // SetTextAsync silently no-ops on Avalonia 11.3 macOS
+                        // when invoked from a borderless transparent window.
+                        // The newer SetDataAsync + DataTransfer path writes reliably.
+                        var transfer = new DataTransfer();
+                        transfer.Add(DataTransferItem.Create(DataFormat.Text, report));
+                        await clipboard.SetDataAsync(transfer);
                         viewModel.StatusMessage = Loc.Instance["Status_DiagnosticsCopied"];
                     }
                 }

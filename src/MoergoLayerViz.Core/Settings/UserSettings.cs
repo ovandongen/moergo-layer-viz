@@ -114,6 +114,14 @@ public record UserSettings
     public string StackedTopHand { get; init; } = "Left";
 
     /// <summary>
+    /// Modifier-key glyph style. "Mac" (default) shows ⌘ ⌥ ⌃ ⇪; "Windows"
+    /// shows ⊞ Alt Ctrl ⇧. User-controlled, independent of the host OS so a
+    /// macOS user looking at a coworker's Windows-typed keymap gets the
+    /// expected glyphs and vice versa.
+    /// </summary>
+    public string ModifierStyle { get; init; } = "Mac";
+
+    /// <summary>
     /// Per-keyboard app→layer rules. Outer key = profile id, value = ordered
     /// list of <see cref="AppLayerRule"/>; the first match (case-insensitive
     /// substring of ProcessName) wins.

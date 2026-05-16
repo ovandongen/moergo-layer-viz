@@ -61,7 +61,7 @@
   <!-- Toolbar tooltips -->
   <data name="Tooltip_Quit"><value>Quit</value></data>
   <data name="Tooltip_Minimize"><value>Minimize</value></data>
-  <data name="Tooltip_LiveHighlighting"><value>Live key highlighting</value></data>
+  <data name="Tooltip_LiveHighlighting"><value>Live tracking — key highlighting + auto layer switch</value></data>
   <data name="Tooltip_AutoLayerSwitch"><value>Auto layer switch</value></data>
   <data name="Tooltip_AlwaysOnTop"><value>Always on top</value></data>
   <data name="Tooltip_OpenLogFolder"><value>Open log folder</value></data>
@@ -72,6 +72,7 @@
   <data name="Tooltip_LoadLayout"><value>Load Moergo layout JSON…</value></data>
   <data name="Tooltip_Keyboard"><value>Keyboard</value></data>
   <data name="Tooltip_StackedLayout"><value>Toggle stacked layout</value></data>
+  <data name="Tooltip_ModifierStyle"><value>Modifier symbols: Mac / Windows</value></data>
 
   <!-- Status messages -->
   <data name="Status_Ready"><value>Ready</value></data>

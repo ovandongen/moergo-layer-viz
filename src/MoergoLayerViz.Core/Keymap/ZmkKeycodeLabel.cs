@@ -1,6 +1,20 @@
 namespace MoergoLayerViz.Core.Keymap;
 
 /// <summary>
+/// Which set of modifier glyphs <see cref="ZmkKeycodeLabel"/> renders for
+/// Shift / Ctrl / Alt / Gui. User-controlled, independent of the host OS —
+/// the toolbar toggle in the app writes <see cref="ZmkKeycodeLabel.CurrentModifierStyle"/>
+/// and then refreshes every key label.
+/// </summary>
+public enum ModifierStyle
+{
+    /// <summary>⇪ ⌃ ⌥ ⌘ — the original styling.</summary>
+    Mac,
+    /// <summary>⇧ Ctrl Alt ⊞ — hybrid: universal Shift arrow and the Microsoft monochrome Windows-key glyph; text for Ctrl/Alt.</summary>
+    Windows,
+}
+
+/// <summary>
 /// Translates ZMK keycode identifiers (as they appear in Moergo JSON exports)
 /// into short display glyphs suitable for rendering on a 40–80px-wide key cap.
 ///
@@ -11,6 +25,12 @@ namespace MoergoLayerViz.Core.Keymap;
 /// </summary>
 public static class ZmkKeycodeLabel
 {
+    /// <summary>
+    /// Active modifier glyph set. Mutated by the UI when the user toggles the
+    /// Mac/Windows toolbar button; reads are unsynchronised because writes
+    /// happen on the UI thread and label rebuilds are also UI-dispatched.
+    /// </summary>
+    public static ModifierStyle CurrentModifierStyle { get; set; } = ModifierStyle.Mac;
     private static readonly Dictionary<string, string> DisplayMap = new(StringComparer.Ordinal)
     {
         // Punctuation — ZMK short abbreviations + long-form aliases the Moergo
@@ -90,20 +110,72 @@ public static class ZmkKeycodeLabel
         ["LEFT"] = "←",      ["LEFT_ARROW"] = "←",
         ["RIGHT"] = "→",     ["RIGHT_ARROW"] = "→",
 
-        // Modifier keys as main labels — L/R hand distinction is dropped
-        // (same convention as ModifierSubscript: the modifier type matters,
-        // the hand usually doesn't when you're scanning a keymap).
-        ["LSHFT"] = "⇪", ["RSHFT"] = "⇪",
-        ["LEFT_SHIFT"] = "⇪", ["RIGHT_SHIFT"] = "⇪",
-        ["LCTRL"] = "⌃", ["RCTRL"] = "⌃",
-        ["LEFT_CONTROL"] = "⌃", ["RIGHT_CONTROL"] = "⌃",
-        ["LALT"] = "⌥", ["RALT"] = "⌥",
-        ["LEFT_ALT"] = "⌥", ["RIGHT_ALT"] = "⌥",
-        ["LGUI"] = "⌘", ["RGUI"] = "⌘",
-        ["LEFT_GUI"] = "⌘", ["RIGHT_GUI"] = "⌘",
-        ["LEFT_COMMAND"] = "⌘", ["RIGHT_COMMAND"] = "⌘",
-        ["LWIN"] = "⌘", ["RWIN"] = "⌘",
+        // Modifier glyphs (LSHFT/LCTRL/LALT/LGUI etc.) are *not* in DisplayMap —
+        // they're style-dependent and resolved through CurrentModifierStyle via
+        // ModifierGlyphForDisplay/ModifierSubscript/ShortModifierGlyph.
     };
+
+    /// <summary>
+    /// Canonical modifier categories that participate in style switching.
+    /// L/R hand distinction is dropped — the modifier *type* is what matters
+    /// when scanning a keymap.
+    /// </summary>
+    private enum Mod { Shift, Ctrl, Alt, Gui }
+
+    /// <summary>
+    /// Maps every ZMK alias for a modifier keycode (short and long form, both
+    /// hands, plus the Mac-specific LEFT_COMMAND / generic L/RWIN names) onto
+    /// its <see cref="Mod"/> category. Membership here is the single source of
+    /// truth for "is this a modifier keycode?".
+    /// </summary>
+    private static readonly Dictionary<string, Mod> ModifierKeycodes = new(StringComparer.Ordinal)
+    {
+        ["LSHFT"] = Mod.Shift, ["RSHFT"] = Mod.Shift,
+        ["LEFT_SHIFT"] = Mod.Shift, ["RIGHT_SHIFT"] = Mod.Shift,
+        ["LCTRL"] = Mod.Ctrl, ["RCTRL"] = Mod.Ctrl,
+        ["LEFT_CONTROL"] = Mod.Ctrl, ["RIGHT_CONTROL"] = Mod.Ctrl,
+        ["LALT"] = Mod.Alt, ["RALT"] = Mod.Alt,
+        ["LEFT_ALT"] = Mod.Alt, ["RIGHT_ALT"] = Mod.Alt,
+        ["LGUI"] = Mod.Gui, ["RGUI"] = Mod.Gui,
+        ["LEFT_GUI"] = Mod.Gui, ["RIGHT_GUI"] = Mod.Gui,
+        ["LEFT_COMMAND"] = Mod.Gui, ["RIGHT_COMMAND"] = Mod.Gui,
+        ["LWIN"] = Mod.Gui, ["RWIN"] = Mod.Gui,
+    };
+
+    /// <summary>Two-character ZMK modifier-function shorthands (used inside <c>LS(...)</c> wrappers).</summary>
+    private static readonly Dictionary<string, Mod> ShortModifierCategories = new(StringComparer.Ordinal)
+    {
+        ["LS"] = Mod.Shift, ["RS"] = Mod.Shift,
+        ["LC"] = Mod.Ctrl,  ["RC"] = Mod.Ctrl,
+        ["LA"] = Mod.Alt,   ["RA"] = Mod.Alt,
+        ["LG"] = Mod.Gui,   ["RG"] = Mod.Gui,
+    };
+
+    private static readonly Dictionary<Mod, string> MacModifierGlyphs = new()
+    {
+        [Mod.Shift] = "⇪",
+        [Mod.Ctrl]  = "⌃",
+        [Mod.Alt]   = "⌥",
+        [Mod.Gui]   = "⌘",
+    };
+
+    /// <summary>
+    /// Hybrid Windows convention: ⇧ (universal Shift arrow) and ⊞ (Microsoft's
+    /// monochrome Windows-key glyph, U+229E). Ctrl/Alt have no single-char
+    /// Windows glyph in widespread use, so they render as plain text.
+    /// </summary>
+    private static readonly Dictionary<Mod, string> WindowsModifierGlyphs = new()
+    {
+        [Mod.Shift] = "⇧",
+        [Mod.Ctrl]  = "Ctrl",
+        [Mod.Alt]   = "Alt",
+        [Mod.Gui]   = "⊞",
+    };
+
+    private static string GlyphFor(Mod m) =>
+        CurrentModifierStyle == ModifierStyle.Windows
+            ? WindowsModifierGlyphs[m]
+            : MacModifierGlyphs[m];
 
     /// <summary>
     /// Returns a short display glyph for a ZMK keycode. Falls through to the
@@ -114,6 +186,7 @@ public static class ZmkKeycodeLabel
         if (string.IsNullOrEmpty(zmkKeycode)) return "";
 
         if (DisplayMap.TryGetValue(zmkKeycode, out var mapped)) return mapped;
+        if (ModifierKeycodes.TryGetValue(zmkKeycode, out var mod)) return GlyphFor(mod);
 
         // Numpad keycodes share the same glyphs as their main-row counterparts.
         // Strip the `KP_` prefix and retry so `KP_N1`, `KP_PLUS`, `KP_DIVIDE`,
@@ -139,35 +212,18 @@ public static class ZmkKeycodeLabel
     /// rarely what the user is checking when glancing at a key. Returns null
     /// for non-modifier keycodes so callers can fall back to the raw param.
     /// </summary>
-    public static string? ModifierSubscript(string zmkKeycode) => zmkKeycode switch
-    {
-        "LSHFT" or "RSHFT" => "⇪",
-        "LCTRL" or "RCTRL" => "⌃",
-        "LALT" or "RALT" => "⌥",
-        "LGUI" or "RGUI" => "⌘",
-        _ => null,
-    };
+    public static string? ModifierSubscript(string zmkKeycode) =>
+        ModifierKeycodes.TryGetValue(zmkKeycode, out var mod) ? GlyphFor(mod) : null;
 
     /// <summary>
     /// ZMK modifier-function shorthands used when wrapping another keycode:
     /// e.g. <c>&amp;kp LS(LBKT)</c> flattens to params ["LS", "LBKT"].
     /// </summary>
-    private static readonly HashSet<string> ShortModifiers = new(StringComparer.Ordinal)
-    {
-        "LS", "RS", "LC", "RC", "LA", "RA", "LG", "RG",
-    };
+    public static bool IsShortModifier(string s) => ShortModifierCategories.ContainsKey(s);
 
-    public static bool IsShortModifier(string s) => ShortModifiers.Contains(s);
-
-    /// <summary>Short-modifier glyph (e.g. LS / RS → ⇧, LC / RC → ⌃).</summary>
-    public static string ShortModifierGlyph(string s) => s switch
-    {
-        "LS" or "RS" => "⇪",
-        "LC" or "RC" => "⌃",
-        "LA" or "RA" => "⌥",
-        "LG" or "RG" => "⌘",
-        _ => s,
-    };
+    /// <summary>Short-modifier glyph (e.g. LS / RS → Shift, LC / RC → Ctrl), style-aware.</summary>
+    public static string ShortModifierGlyph(string s) =>
+        ShortModifierCategories.TryGetValue(s, out var mod) ? GlyphFor(mod) : s;
 
     /// <summary>
     /// US-QWERTY shifted symbol for a keycode — e.g. LBKT → "{", N1 → "!".

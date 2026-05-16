@@ -152,16 +152,6 @@
                                       Data="M3 12h4l3-8 4 16 3-8h4" />
                         </Button>
 
-                        <!-- Auto layer switch — drives the app→layer rules engine -->
-                        <Button x:Name="AutoLayerButton"
-                                Command="{Binding ToggleAutoLayerSwitchCommand}"
-                                Classes="toggle"
-                                Classes.active="{Binding IsAutoLayerSwitchEnabled}"
-                                Padding="8,4"
-                                ToolTip.Tip="{Binding [Tooltip_AutoLayerSwitch], Source={StaticResource Loc}}">
-                            <PathIcon Width="14" Height="14"
-                                      Data="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
-                        </Button>
 
                         <!-- Stacked / horizontal layout toggle -->
                         <Button x:Name="StackedLayoutButton"
@@ -172,6 +162,16 @@
                                 ToolTip.Tip="{Binding [Tooltip_StackedLayout], Source={StaticResource Loc}}">
                             <PathIcon Width="14" Height="14"
                                       Data="M4 2h16v8H4V2zm0 12h16v8H4v-8z" />
+                        </Button>
+
+                        <!-- Modifier symbol style: Apple icon = Mac (⌘ ⌥ ⌃ ⇪), Windows-logo icon = Windows (⊞ Alt Ctrl ⇧).
+                             Not a Classes="toggle" — both states are equally "on", the icon itself communicates state. -->
+                        <Button x:Name="ModifierStyleButton"
+                                Command="{Binding ToggleWindowsModifierStyleCommand}"
+                                Padding="8,4"
+                                ToolTip.Tip="{Binding [Tooltip_ModifierStyle], Source={StaticResource Loc}}">
+                            <PathIcon Width="14" Height="14"
+                                      Data="{Binding ModifierStyleIconData}" />
                         </Button>
 
                         <!-- Load layout JSON -->

@@ -59,7 +59,7 @@
 
   <data name="Tooltip_Quit"><value>Afsluiten</value></data>
   <data name="Tooltip_Minimize"><value>Minimaliseren</value></data>
-  <data name="Tooltip_LiveHighlighting"><value>Live toetsen tonen</value></data>
+  <data name="Tooltip_LiveHighlighting"><value>Live tracking — toetsen tonen + automatische laagwissel</value></data>
   <data name="Tooltip_AutoLayerSwitch"><value>Automatische laagwissel</value></data>
   <data name="Tooltip_AlwaysOnTop"><value>Altijd op voorgrond</value></data>
   <data name="Tooltip_OpenLogFolder"><value>Logmap openen</value></data>
@@ -70,6 +70,7 @@
   <data name="Tooltip_LoadLayout"><value>Moergo layout JSON openen…</value></data>
   <data name="Tooltip_Keyboard"><value>Toetsenbord</value></data>
   <data name="Tooltip_StackedLayout"><value>Gestapelde indeling wisselen</value></data>
+  <data name="Tooltip_ModifierStyle"><value>Modifier-symbolen: Mac / Windows</value></data>
 
   <data name="Status_Ready"><value>Klaar</value></data>
   <data name="Status_NoLayoutLoaded"><value>Geen layout geladen — klik op het mappictogram om een Moergo JSON te openen</value></data>

@@ -271,6 +271,39 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     partial void OnStackedTopHandChanged(string value) =>
         PersistSetting(s => s with { StackedTopHand = value });
 
+    /// <summary>
+    /// True when the board renders Windows-style modifier glyphs (⊞ Alt Ctrl ⇧)
+    /// instead of the default Mac set (⌘ ⌥ ⌃ ⇪). User-controlled via the
+    /// toolbar; persisted across launches as <see cref="UserSettings.ModifierStyle"/>.
+    /// Backed by the static <see cref="ZmkKeycodeLabel.CurrentModifierStyle"/>
+    /// which every label-builder reads at render time.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ModifierStyleIconData))]
+    private bool _isWindowsModifierStyle;
+
+    /// <summary>
+    /// SVG path data for the toolbar button's icon: Apple silhouette when the
+    /// Mac style is active, four-square Windows logo when the Windows style is
+    /// active. Both paths are designed against a 24×24 viewBox so PathIcon
+    /// scales them like the rest of the toolbar icons.
+    /// </summary>
+    public string ModifierStyleIconData => IsWindowsModifierStyle
+        ? "M3 5.479L10.768 4.5v8.385H3V5.479zM11.232 4.5L21 3v9.885h-9.768V4.5zM3 13.115h7.768V21.5L3 20.521V13.115zM11.232 13.115H21V22.5l-9.768-1.385V13.115z"
+        : "M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z";
+
+    partial void OnIsWindowsModifierStyleChanged(bool value)
+    {
+        ZmkKeycodeLabel.CurrentModifierStyle = value ? ModifierStyle.Windows : ModifierStyle.Mac;
+        PersistSetting(s => s with { ModifierStyle = value ? "Windows" : "Mac" });
+        // Same redraw hook SetLayerColorOverride uses: rebuilds every key's
+        // labels against the freshly-set static.
+        if (_config is not null) ApplyActiveLayer(ActiveLayerIndex);
+    }
+
+    [RelayCommand]
+    private void ToggleWindowsModifierStyle() => IsWindowsModifierStyle = !IsWindowsModifierStyle;
+
     /// <summary>Canvas size for the current keyboard profile and layout mode (drives BoardView's Canvas width/height).</summary>
     public double CanvasWidth => IsStackedLayout
         ? Math.Max(_leftBounds.MaxX - _leftBounds.MinX, _rightBounds.MaxX - _rightBounds.MinX) + 2 * StackedMargin
@@ -355,7 +388,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     public IRelayCommand RefreshCommand { get; }
     public IRelayCommand TogglePinCommand { get; }
     public IRelayCommand ToggleLiveHighlightingCommand { get; }
-    public IRelayCommand ToggleAutoLayerSwitchCommand { get; }
     public IRelayCommand OpenLogFolderCommand { get; }
     public IRelayCommand CopyDiagnosticsCommand { get; }
     public IRelayCommand<IKeyboardProfile> SelectKeyboardCommand { get; }
@@ -457,6 +489,11 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             _hotkeyKey = s.HotkeyKey;
         _isStackedLayout = s.StackedLayout;
         _stackedTopHand = string.IsNullOrWhiteSpace(s.StackedTopHand) ? "Left" : s.StackedTopHand;
+        _isWindowsModifierStyle = string.Equals(s.ModifierStyle, "Windows", StringComparison.OrdinalIgnoreCase);
+        // Seed the static *before* the first ApplyActiveLayer so initial render
+        // already uses the persisted glyph set (the partial change handler is
+        // not invoked when the backing field is assigned directly).
+        ZmkKeycodeLabel.CurrentModifierStyle = _isWindowsModifierStyle ? ModifierStyle.Windows : ModifierStyle.Mac;
         // Seed the static palette with persisted per-keyboard, per-layer overrides
         // so the very first paint already reflects the user's customization.
         LayerColorPalette.SetOverrides(s.LayerColors);
@@ -532,13 +569,6 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             PersistSetting(s2 => s2 with { AlwaysOnTop = IsAlwaysOnTop });
         });
         ToggleLiveHighlightingCommand = new RelayCommand(ToggleLiveHighlighting);
-        ToggleAutoLayerSwitchCommand = new RelayCommand(() =>
-        {
-            IsAutoLayerSwitchEnabled = !IsAutoLayerSwitchEnabled;
-            PersistSetting(s2 => s2 with { AutoLayerSwitch = IsAutoLayerSwitchEnabled });
-            if (!IsAutoLayerSwitchEnabled)
-                ResetLayerState();
-        });
         OpenLogFolderCommand = new RelayCommand(() =>
         {
             try
@@ -1060,13 +1090,28 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     private void ToggleLiveHighlighting()
     {
-        IsLiveHighlightingEnabled = !IsLiveHighlightingEnabled;
-        PersistSetting(s2 => s2 with { LiveKeyHighlighting = IsLiveHighlightingEnabled });
+        var enable = !IsLiveHighlightingEnabled;
+        IsLiveHighlightingEnabled = enable;
+        // Merged toolbar toggle: AutoLayerSwitch rides along with
+        // LiveHighlighting so users get a single "live" master switch.
+        // The underlying booleans stay distinct in UserSettings so any
+        // future independent control point can still flip them apart.
+        IsAutoLayerSwitchEnabled = enable;
+        PersistSetting(s2 => s2 with
+        {
+            LiveKeyHighlighting = enable,
+            AutoLayerSwitch = enable,
+        });
 
-        if (IsLiveHighlightingEnabled)
+        if (enable)
+        {
             StartKeyEventTracking();
+        }
         else
+        {
             StopKeyEventTracking();
+            ResetLayerState();
+        }
     }
 
     private void StartKeyEventTracking()
