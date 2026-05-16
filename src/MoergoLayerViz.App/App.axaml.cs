@@ -156,11 +156,8 @@ public partial class App : Application
 
                 void ApplyTrayIcon()
                 {
-                    var tinted = viewModel.ColorTrayIconByActiveLayer;
-                    var color = viewModel.ActiveLayerTintColor;
-                    DiagnosticLog.Info("TrayIcon", $"ApplyTrayIcon tinted={tinted} color={color} layer={viewModel.ActiveLayerIndex}");
-                    var icon = tinted
-                        ? trayTinter.GetTinted(color)
+                    var icon = viewModel.ColorTrayIconByActiveLayer
+                        ? trayTinter.GetTinted(viewModel.ActiveLayerTintColor)
                         : trayTinter.GetOriginal();
                     trayIcon.Icon = icon;
                     // Mirror onto the main window so the Windows taskbar entry
