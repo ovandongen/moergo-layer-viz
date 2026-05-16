@@ -1,6 +1,7 @@
 using MoergoLayerViz.App.Services.MouseIdle;
 using MoergoLayerViz.Core.Diagnostics;
 using MoergoLayerViz.Core.Layout;
+using MoergoLayerViz.Core.Models;
 using MoergoLayerViz.Core.Settings;
 using ZmkHidProtocol.ActiveWindow;
 
@@ -22,6 +23,7 @@ namespace MoergoLayerViz.App.Services;
 public sealed class LayerPushCoordinator : IDisposable
 {
     private readonly IHidPipeline _hid;
+    private Func<int, int, TransparentBindingKind?> _classifyBinding;
     private bool _disposed;
 
     public AutoSwitchEngine AutoSwitch { get; }
@@ -29,6 +31,18 @@ public sealed class LayerPushCoordinator : IDisposable
 
     /// <summary>Re-raised key-position events for the host's press-highlight tracker.</summary>
     public event Action<int, bool>? KeyPositionForUi;
+
+    /// <summary>
+    /// Replaces the binding classifier the coordinator uses to detect the
+    /// transparent-key / empty-key exit gestures. Returns
+    /// <see cref="TransparentBindingKind.Transparent"/> for <c>&amp;trans</c>,
+    /// <see cref="TransparentBindingKind.Empty"/> for <c>&amp;none</c>, and
+    /// <c>null</c> for any other binding. Called by the host when a new
+    /// keyboard config is loaded (or cleared). Default classifier always
+    /// returns null — the feature is inert until a config is bound.
+    /// </summary>
+    public void SetTransparencyPredicate(Func<int, int, TransparentBindingKind?>? classifier)
+        => _classifyBinding = classifier ?? ((_, _) => null);
 
     public LayerPushCoordinator(
         IHidPipeline hid,
@@ -39,6 +53,7 @@ public sealed class LayerPushCoordinator : IDisposable
         IMouseIdleMonitor? mouseIdleMonitor)
     {
         _hid = hid;
+        _classifyBinding = (_, _) => null;
 
         // AutoSwitch reads "the layer underneath any in-flight mouse-layer
         // push" so its captured PreRuleLayer (and userOverrode comparison)
@@ -144,5 +159,27 @@ public sealed class LayerPushCoordinator : IDisposable
         // detector, so this is free when no exit key is configured.
         AutoSwitch.OnKeyPositionEvent(position, pressed);
         KeyPositionForUi?.Invoke(position, pressed);
+
+        // Transparent / empty-key exit: only on press (release would
+        // double-fire). &trans and &none are independent per-engine opt-ins,
+        // so the host can offer "exit on either / one / neither". Mouse-layer
+        // push takes precedence — it's the visually-on-top push and its
+        // revert lands on the captured pre-move layer, which is what the
+        // user expects to return to.
+        if (!pressed) return;
+        if (_classifyBinding(_hid.CurrentLayer, position) is not TransparentBindingKind kind) return;
+        bool isTrans = kind == TransparentBindingKind.Transparent;
+        string reason = isTrans ? "transparent key tap" : "empty key tap";
+
+        if (MouseLayer is { PreMoveLayer: not null, CurrentSettings: var ms }
+            && ((isTrans && ms.ExitOnTransparentKey) || (!isTrans && ms.ExitOnEmptyKey)))
+        {
+            MouseLayer.RevertNow(reason);
+            return;
+        }
+
+        if ((isTrans && AutoSwitch.ExitOnTransparentKey)
+            || (!isTrans && AutoSwitch.ExitOnEmptyKey))
+            AutoSwitch.ExitToFallback(reason);
     }
 }

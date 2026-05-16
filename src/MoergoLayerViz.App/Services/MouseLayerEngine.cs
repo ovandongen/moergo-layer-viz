@@ -97,6 +97,12 @@ public sealed class MouseLayerEngine
             clone[profileId] = settings;
             return s with { MouseLayer = clone };
         });
+        // Stop+Start cycle (not just Start) so the monitor's internal state
+        // machine resets — Start() is a no-op when already running, which
+        // would otherwise leave _moving / _lastMoveTicks stale across the
+        // settings change and the engine wouldn't fire MoveStarted on the
+        // next real movement until a full natural idle→move cycle elapsed.
+        _monitor.Stop();
         ReevaluateMonitorState();
     }
 
@@ -129,6 +135,15 @@ public sealed class MouseLayerEngine
     /// <summary>Marks the in-flight push as consumed (without firing another
     /// revert). Called by the host after it issues a synchronous shutdown push.</summary>
     public void ClearPushedState() => _preMoveLayer = null;
+
+    /// <summary>
+    /// External revert trigger — fires the captured pre-move layer if a push
+    /// is in flight, otherwise no-op. Used by the coordinator to unwind a
+    /// push on a transparent / empty keypress (and the natural exit gesture
+    /// when <see cref="MouseLayerSettings.EndlessTimeout"/> suppresses the
+    /// idle-driven revert).
+    /// </summary>
+    public void RevertNow(string reason) => RevertIfPushed(reason);
 
     /// <summary>
     /// Called by the host when another engine (e.g. AutoSwitch) wants to push
@@ -204,6 +219,10 @@ public sealed class MouseLayerEngine
     private void OnMoveStopped()
     {
         if (!IsActive) return;
+        // EndlessTimeout suppresses the idle-driven revert: the push stays in
+        // flight (PreMoveLayer remains populated) until an external trigger
+        // (transparent-key tap, profile switch, shutdown) tears it down.
+        if (_settings.EndlessTimeout) return;
         // Only OnMoveStarted arms the revert (by capturing _preMoveLayer). If
         // we're idle here it means the push was already reverted out-of-band
         // (settings change / profile switch) — firing layer 0 would jump the

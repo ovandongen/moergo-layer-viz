@@ -277,6 +277,50 @@ public class MouseLayerEngineTests
     }
 
     [Fact]
+    public void EndlessTimeout_MoveStop_DoesNotPushAndKeepsPreMoveLayer()
+    {
+        var monitor = new FakeMouseIdleMonitor();
+        var engine = NewEngine(
+            new MouseLayerSettings(Enabled: true, MouseLayerIndex: 4, EndlessTimeout: true),
+            monitor, () => 2, () => true, out var pushes, out _);
+
+        monitor.FireMoveStarted();   // captures pre-move = 2, pushes 4
+        monitor.FireMoveStopped();   // endless → suppressed
+
+        Assert.Equal(new[] { 4 }, pushes);
+        Assert.Equal(2, engine.PreMoveLayer);
+    }
+
+    [Fact]
+    public void RevertNow_WhilePushing_FiresCapturedPreMoveAndClears()
+    {
+        var monitor = new FakeMouseIdleMonitor();
+        var engine = NewEngine(
+            new MouseLayerSettings(Enabled: true, MouseLayerIndex: 4, EndlessTimeout: true),
+            monitor, () => 2, () => true, out var pushes, out _);
+
+        monitor.FireMoveStarted();          // pushes 4, pre-move=2
+        engine.RevertNow("test");           // pushes 2, clears
+
+        Assert.Equal(new[] { 4, 2 }, pushes);
+        Assert.Null(engine.PreMoveLayer);
+    }
+
+    [Fact]
+    public void RevertNow_WithoutPush_IsNoOp()
+    {
+        var monitor = new FakeMouseIdleMonitor();
+        var engine = NewEngine(
+            new MouseLayerSettings(Enabled: true, MouseLayerIndex: 4),
+            monitor, () => 2, () => true, out var pushes, out _);
+
+        engine.RevertNow("test");
+
+        Assert.Empty(pushes);
+        Assert.Null(engine.PreMoveLayer);
+    }
+
+    [Fact]
     public void SetActiveProfile_ReloadsSettingsForNewProfile()
     {
         var monitor = new FakeMouseIdleMonitor();

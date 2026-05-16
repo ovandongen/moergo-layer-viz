@@ -123,6 +123,36 @@ public sealed partial class AutoSwitchEngine : ObservableObject
         });
     }
 
+    [ObservableProperty]
+    private bool _exitOnTransparentKey;
+
+    partial void OnExitOnTransparentKeyChanged(bool value)
+    {
+        var profileId = _profile.Id;
+        PersistSetting(s =>
+        {
+            var clone = new Dictionary<string, bool>(s.AutoSwitchExitOnTransparent);
+            if (value) clone[profileId] = true;
+            else clone.Remove(profileId);
+            return s with { AutoSwitchExitOnTransparent = clone };
+        });
+    }
+
+    [ObservableProperty]
+    private bool _exitOnEmptyKey;
+
+    partial void OnExitOnEmptyKeyChanged(bool value)
+    {
+        var profileId = _profile.Id;
+        PersistSetting(s =>
+        {
+            var clone = new Dictionary<string, bool>(s.AutoSwitchExitOnEmpty);
+            if (value) clone[profileId] = true;
+            else clone.Remove(profileId);
+            return s with { AutoSwitchExitOnEmpty = clone };
+        });
+    }
+
     private AppLayerRule? _matchedAppLayerRule;
     public AppLayerRule? MatchedAppLayerRule => _matchedAppLayerRule;
 
@@ -179,6 +209,31 @@ public sealed partial class AutoSwitchEngine : ObservableObject
     public void OnKeyPositionEvent(int position, bool pressed)
         => _exitTapDetector.OnKeyEvent(position, pressed);
 
+    /// <summary>
+    /// Pushes the configured fallback layer and marks the current session as
+    /// user-exited (so a subsequent focus change to the same rule won't auto
+    /// re-fire). No-op when the engine isn't in a session or when the user
+    /// has already exited this session. Mirrors the first branch of the
+    /// double-tap exit handler — extracted so the coordinator can trigger
+    /// the same exit from a transparent-key tap. Marshals to the UI thread.
+    /// </summary>
+    public void ExitToFallback(string reason)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (!IsEnabled) return;
+            if (_session is not AutoSwitchSession.InSession s) return;
+            if (s.UserExited) return;
+            int target = GetFallbackTargetLayer(s.PreRuleLayer);
+            int activeLayer = _getActiveLayer();
+            if (target != activeLayer)
+                PushLayerRequested?.Invoke(target);
+            _session = s with { UserExited = true };
+            DiagnosticLog.Info("AutoSwitch",
+                $"{reason}: fell back to layer {target} (rule was '{s.LastFiredRule.ProcessMatch}' → {s.LastFiredRule.LayerIndex})");
+        });
+    }
+
     /// <summary>Detaches from the monitor + detector. Idempotent.</summary>
     public void Shutdown()
     {
@@ -234,6 +289,8 @@ public sealed partial class AutoSwitchEngine : ObservableObject
         FallbackMode = s.AutoSwitchFallback.TryGetValue(_profile.Id, out var m)
             ? m
             : AutoSwitchFallbackMode.Base;
+        ExitOnTransparentKey = s.AutoSwitchExitOnTransparent.TryGetValue(_profile.Id, out var t) && t;
+        ExitOnEmptyKey = s.AutoSwitchExitOnEmpty.TryGetValue(_profile.Id, out var e) && e;
     }
 
     private void ReloadExitTapKey()
@@ -318,18 +375,16 @@ public sealed partial class AutoSwitchEngine : ObservableObject
             if (_session is not AutoSwitchSession.InSession s) return;
             var match = MatchedAppLayerRule;
             if (match is null) return;
-            int activeLayer = _getActiveLayer();
 
             if (!s.UserExited)
             {
-                int target = GetFallbackTargetLayer(s.PreRuleLayer);
-                if (target != activeLayer)
-                    PushLayerRequested?.Invoke(target);
-                _session = s with { UserExited = true };
-                DiagnosticLog.Info("AutoSwitch", $"exit tap: fell back to layer {target} (rule was '{match.ProcessMatch}' → {match.LayerIndex})");
+                // ExitToFallback re-posts to the UI thread, which is a no-op
+                // when already on it. Cheaper than duplicating the body here.
+                ExitToFallback("exit tap");
                 return;
             }
 
+            int activeLayer = _getActiveLayer();
             if (match.LayerIndex != activeLayer)
                 PushLayerRequested?.Invoke(match.LayerIndex);
             _session = s with

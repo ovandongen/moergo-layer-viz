@@ -446,4 +446,115 @@ public class AutoSwitchEngineTests
         Assert.Null(engine.ExitTapKey);
         Assert.False(settings.Current.AutoSwitchExitKey.ContainsKey(profile.Id));
     }
+
+    // ─── Exit-on-transparent persistence ────────────────────────────────
+
+    [Fact]
+    public void ExitOnTransparentKey_Setter_PersistsPerProfile()
+    {
+        var profile = new Go60Profile();
+        var (engine, _, settings) = NewEngine(profile: profile);
+
+        engine.ExitOnTransparentKey = true;
+
+        Assert.True(engine.ExitOnTransparentKey);
+        Assert.True(settings.Current.AutoSwitchExitOnTransparent[profile.Id]);
+    }
+
+    [Fact]
+    public void ExitOnTransparentKey_SetterFalse_RemovesPersistedEntry()
+    {
+        var profile = new Go60Profile();
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                AutoSwitchExitOnTransparent = new Dictionary<string, bool> { [profile.Id] = true },
+            },
+        };
+        var engine = new AutoSwitchEngine(settings, null, () => 0, profile);
+        Assert.True(engine.ExitOnTransparentKey);
+
+        engine.ExitOnTransparentKey = false;
+
+        Assert.False(engine.ExitOnTransparentKey);
+        Assert.False(settings.Current.AutoSwitchExitOnTransparent.ContainsKey(profile.Id));
+    }
+
+    [Fact]
+    public void SetActiveProfile_LoadsExitOnTransparentForNewProfile()
+    {
+        var go60 = new Go60Profile();
+        var glove = new Glove80Profile();
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                AutoSwitchExitOnTransparent = new Dictionary<string, bool>
+                {
+                    [go60.Id] = false,
+                    [glove.Id] = true,
+                },
+            },
+        };
+        var engine = new AutoSwitchEngine(settings, null, () => 0, go60);
+        Assert.False(engine.ExitOnTransparentKey);
+
+        engine.SetActiveProfile(glove);
+
+        Assert.True(engine.ExitOnTransparentKey);
+    }
+
+    // ─── Exit-on-empty persistence (parallel to trans) ──────────────────
+
+    [Fact]
+    public void ExitOnEmptyKey_Setter_PersistsPerProfile()
+    {
+        var profile = new Go60Profile();
+        var (engine, _, settings) = NewEngine(profile: profile);
+
+        engine.ExitOnEmptyKey = true;
+
+        Assert.True(engine.ExitOnEmptyKey);
+        Assert.True(settings.Current.AutoSwitchExitOnEmpty[profile.Id]);
+    }
+
+    [Fact]
+    public void ExitOnEmptyKey_SetterFalse_RemovesPersistedEntry()
+    {
+        var profile = new Go60Profile();
+        var settings = new InMemorySettingsService
+        {
+            Current = new UserSettings
+            {
+                AutoSwitchExitOnEmpty = new Dictionary<string, bool> { [profile.Id] = true },
+            },
+        };
+        var engine = new AutoSwitchEngine(settings, null, () => 0, profile);
+        Assert.True(engine.ExitOnEmptyKey);
+
+        engine.ExitOnEmptyKey = false;
+
+        Assert.False(engine.ExitOnEmptyKey);
+        Assert.False(settings.Current.AutoSwitchExitOnEmpty.ContainsKey(profile.Id));
+    }
+
+    [Fact]
+    public void ExitOnTransparentAndEmpty_AreIndependent()
+    {
+        var profile = new Go60Profile();
+        var (engine, _, settings) = NewEngine(profile: profile);
+
+        engine.ExitOnTransparentKey = true;
+        engine.ExitOnEmptyKey = true;
+        Assert.True(engine.ExitOnTransparentKey);
+        Assert.True(engine.ExitOnEmptyKey);
+
+        engine.ExitOnTransparentKey = false;
+
+        Assert.False(engine.ExitOnTransparentKey);
+        Assert.True(engine.ExitOnEmptyKey);
+        Assert.True(settings.Current.AutoSwitchExitOnEmpty[profile.Id]);
+        Assert.False(settings.Current.AutoSwitchExitOnTransparent.ContainsKey(profile.Id));
+    }
 }

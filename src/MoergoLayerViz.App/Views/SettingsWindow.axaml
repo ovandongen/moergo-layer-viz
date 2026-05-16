@@ -252,6 +252,16 @@
                                     Command="{Binding ClearExitTapCommand}"
                                     IsEnabled="{Binding HasExitTap}" />
                         </StackPanel>
+
+                        <CheckBox Content="{Binding [Settings_AutoSwitch_ExitOnTransparent], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding IsAutoSwitchExitOnTransparentKey, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}"
+                                  Margin="0,6,0,0" />
+                        <CheckBox Content="{Binding [Settings_AutoSwitch_ExitOnEmpty], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding IsAutoSwitchExitOnEmptyKey, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_AutoSwitch_ExitOnTransparent_Hint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
                     </StackPanel>
 
                     <Border Height="1" Background="{StaticResource BgSurface0}" />
@@ -412,12 +422,15 @@
                         </ComboBox>
                     </StackPanel>
 
-                    <!-- Idle-timeout slider, 200–2000 ms; numeric readout to the right. -->
+                    <!-- Idle-timeout slider, 200–2000 ms; numeric readout to the right.
+                         Disabled when Endless is checked — the value is preserved so
+                         toggling endless off restores the previous timeout. -->
                     <StackPanel Spacing="4" Margin="0,4,0,0"
                                 IsEnabled="{Binding IsMouseLayerEnabled}">
                         <TextBlock Text="{Binding [Settings_MouseLayer_IdleTimeout], Source={StaticResource Loc}}"
                                    Foreground="{StaticResource Text}" FontSize="12" />
-                        <Grid ColumnDefinitions="*,Auto">
+                        <Grid ColumnDefinitions="*,Auto"
+                              IsEnabled="{Binding IsMouseLayerIdleTimeoutEnabled}">
                             <Slider Grid.Column="0"
                                     Minimum="200" Maximum="2000"
                                     TickFrequency="50"
@@ -432,6 +445,27 @@
                                        VerticalAlignment="Center"
                                        Margin="8,0,0,0" />
                         </Grid>
+                        <CheckBox Content="{Binding [Settings_MouseLayer_EndlessTimeout], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding IsMouseLayerEndlessTimeout, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_MouseLayer_EndlessTimeout_Hint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <!-- Transparent (&trans) and empty (&none) keypress
+                         exits — independent per-flag opt-ins. When endless
+                         timeout is on the SettingsViewModel guarantees ≥1
+                         remains enabled. -->
+                    <StackPanel Spacing="4" Margin="0,8,0,0"
+                                IsEnabled="{Binding IsMouseLayerEnabled}">
+                        <CheckBox Content="{Binding [Settings_MouseLayer_ExitOnTransparent], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding IsMouseLayerExitOnTransparentKey, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}" />
+                        <CheckBox Content="{Binding [Settings_MouseLayer_ExitOnEmpty], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding IsMouseLayerExitOnEmptyKey, Mode=TwoWay}"
+                                  Foreground="{StaticResource Text}" />
+                        <TextBlock Text="{Binding [Settings_MouseLayer_ExitOnTransparent_Hint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
                     </StackPanel>
 
                 </StackPanel>

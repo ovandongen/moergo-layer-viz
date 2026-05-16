@@ -161,6 +161,24 @@ public record UserSettings
     public Dictionary<string, int> AutoSwitchExitKey { get; init; } = new();
 
     /// <summary>
+    /// Per-keyboard opt-in: when true, a keypress whose binding on the
+    /// active layer is literally <c>&amp;trans</c> triggers an early exit
+    /// of an in-flight managed-app push (same fallback target as the
+    /// double-tap exit key). Missing entries resolve to false. Independent
+    /// from <see cref="AutoSwitchExitOnEmpty"/> — users can opt in to one,
+    /// both, or neither.
+    /// </summary>
+    public Dictionary<string, bool> AutoSwitchExitOnTransparent { get; init; } = new();
+
+    /// <summary>
+    /// Per-keyboard opt-in: when true, a keypress whose binding on the
+    /// active layer is literally <c>&amp;none</c> triggers an early exit
+    /// of an in-flight managed-app push. See
+    /// <see cref="AutoSwitchExitOnTransparent"/> for sibling semantics.
+    /// </summary>
+    public Dictionary<string, bool> AutoSwitchExitOnEmpty { get; init; } = new();
+
+    /// <summary>
     /// Per-keyboard mouse-movement layer-push configuration. Outer key =
     /// profile id, value = the settings for that profile. Missing entries
     /// resolve to a disabled default (<see cref="MouseLayerSettings"/> with

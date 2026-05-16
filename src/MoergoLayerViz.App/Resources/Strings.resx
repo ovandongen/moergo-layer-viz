@@ -112,6 +112,11 @@
   <data name="Settings_MouseLayer_Enable"><value>Enable mouse-movement layer push</value></data>
   <data name="Settings_MouseLayer_Layer"><value>Layer to push while moving:</value></data>
   <data name="Settings_MouseLayer_IdleTimeout"><value>Idle timeout (ms):</value></data>
+  <data name="Settings_MouseLayer_EndlessTimeout"><value>Endless timeout (only exit via the options below)</value></data>
+  <data name="Settings_MouseLayer_EndlessTimeout_Hint"><value>When checked, the idle timeout is disabled and the mouse layer stays pushed until a transparent or empty key is pressed. At least one of the options below must remain enabled.</value></data>
+  <data name="Settings_MouseLayer_ExitOnTransparent"><value>Exit on transparent key press (&amp;trans)</value></data>
+  <data name="Settings_MouseLayer_ExitOnEmpty"><value>Exit on empty key press (&amp;none)</value></data>
+  <data name="Settings_MouseLayer_ExitOnTransparent_Hint"><value>While the mouse layer is pushed, pressing a key whose binding on the active layer matches an enabled option above reverts immediately. Move the mouse again to re-arm.</value></data>
   <data name="Settings_AutoSwitch_Header"><value>App → layer rules</value></data>
   <data name="Settings_AutoSwitch_Hint"><value>Rules are evaluated in order; the first whose match text is a case-insensitive substring of the focused app's process name wins. Editing rules persists immediately. When enabled, the matched layer is pushed to the keyboard on every focus change.</value></data>
   <data name="Settings_AutoSwitch_Enable"><value>Enable auto-switch (push matched layer to keyboard on focus change)</value></data>
@@ -120,6 +125,9 @@
   <data name="Settings_AutoSwitch_FallbackBase"><value>Switch to base layer (0)</value></data>
   <data name="Settings_AutoSwitch_ExitKeysLabel"><value>Exit key (double-tap to toggle):</value></data>
   <data name="Settings_AutoSwitch_ExitKeysHint"><value>Pick one key on the keyboard. Double-tapping it while a rule layer is active falls back to the selected layer above; double-tapping again returns to the rule's layer. Best picked on a key whose binding emits no OS keystrokes (e.g. Moergo's &amp;magic).</value></data>
+  <data name="Settings_AutoSwitch_ExitOnTransparent"><value>Exit on transparent key press (&amp;trans)</value></data>
+  <data name="Settings_AutoSwitch_ExitOnEmpty"><value>Exit on empty key press (&amp;none)</value></data>
+  <data name="Settings_AutoSwitch_ExitOnTransparent_Hint"><value>While a rule layer is active, pressing a key whose binding on that layer matches an enabled option above falls back immediately. Double-tap the exit key to re-enter the rule.</value></data>
   <data name="Settings_AutoSwitch_ExitKeysNone"><value>(none)</value></data>
   <data name="Settings_AutoSwitch_PickExitKeys"><value>Pick key…</value></data>
   <data name="Settings_AutoSwitch_ClearExitKeys"><value>Clear</value></data>

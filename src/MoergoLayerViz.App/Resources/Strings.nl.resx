@@ -106,6 +106,11 @@
   <data name="Settings_MouseLayer_Enable"><value>Laag-omschakeling bij muisbeweging inschakelen</value></data>
   <data name="Settings_MouseLayer_Layer"><value>Laag tijdens beweging:</value></data>
   <data name="Settings_MouseLayer_IdleTimeout"><value>Inactiviteitstijd (ms):</value></data>
+  <data name="Settings_MouseLayer_EndlessTimeout"><value>Eindeloze tijdslimiet (alleen verlaten via de opties hieronder)</value></data>
+  <data name="Settings_MouseLayer_EndlessTimeout_Hint"><value>Indien aangevinkt is de tijdslimiet uitgeschakeld en blijft de muislaag actief totdat een transparante of lege toets wordt ingedrukt. Minstens één van de opties hieronder moet aangevinkt blijven.</value></data>
+  <data name="Settings_MouseLayer_ExitOnTransparent"><value>Verlaten bij transparante toets (&amp;trans)</value></data>
+  <data name="Settings_MouseLayer_ExitOnEmpty"><value>Verlaten bij lege toets (&amp;none)</value></data>
+  <data name="Settings_MouseLayer_ExitOnTransparent_Hint"><value>Terwijl de muislaag actief is, schakelt het indrukken van een toets waarvan de binding op de huidige laag overeenkomt met een aangevinkte optie hierboven direct terug. Beweeg de muis opnieuw om opnieuw te activeren.</value></data>
   <data name="Settings_AutoSwitch_Header"><value>App → laag-regels</value></data>
   <data name="Settings_AutoSwitch_Hint"><value>Regels worden in volgorde gecontroleerd; de eerste waarvan de zoekterm hoofdletterongevoelig voorkomt in de procesnaam van de actieve app wint. Wijzigingen worden direct opgeslagen. Indien ingeschakeld wordt bij elke focuswissel de bijbehorende laag naar het toetsenbord gestuurd.</value></data>
   <data name="Settings_AutoSwitch_Enable"><value>Automatisch schakelen inschakelen (gekoppelde laag naar toetsenbord bij focuswissel)</value></data>
@@ -114,6 +119,9 @@
   <data name="Settings_AutoSwitch_FallbackBase"><value>Naar basislaag (0) schakelen</value></data>
   <data name="Settings_AutoSwitch_ExitKeysLabel"><value>Ontsnap-toets (dubbeltik om te schakelen):</value></data>
   <data name="Settings_AutoSwitch_ExitKeysHint"><value>Kies één toets op het toetsenbord. Dubbeltikken terwijl een regel-laag actief is schakelt naar de gekozen terugvallaag hierboven; opnieuw dubbeltikken keert terug naar de laag van de regel. Kies bij voorkeur een toets die geen OS-toetsaanslag verstuurt (bv. Moergo's &amp;magic).</value></data>
+  <data name="Settings_AutoSwitch_ExitOnTransparent"><value>Verlaten bij transparante toets (&amp;trans)</value></data>
+  <data name="Settings_AutoSwitch_ExitOnEmpty"><value>Verlaten bij lege toets (&amp;none)</value></data>
+  <data name="Settings_AutoSwitch_ExitOnTransparent_Hint"><value>Terwijl een regel-laag actief is, schakelt het indrukken van een toets waarvan de binding op die laag overeenkomt met een aangevinkte optie hierboven direct terug naar de terugvallaag. Dubbeltik op de ontsnap-toets om de regel opnieuw te activeren.</value></data>
   <data name="Settings_AutoSwitch_ExitKeysNone"><value>(geen)</value></data>
   <data name="Settings_AutoSwitch_PickExitKeys"><value>Toets kiezen…</value></data>
   <data name="Settings_AutoSwitch_ClearExitKeys"><value>Wissen</value></data>

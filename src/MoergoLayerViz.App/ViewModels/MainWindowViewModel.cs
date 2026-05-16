@@ -423,6 +423,20 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         set => _push.AutoSwitch.FallbackMode = value;
     }
 
+    /// <inheritdoc cref="AutoSwitchEngine.ExitOnTransparentKey"/>
+    public bool AutoSwitchExitOnTransparentKey
+    {
+        get => _push.AutoSwitch.ExitOnTransparentKey;
+        set => _push.AutoSwitch.ExitOnTransparentKey = value;
+    }
+
+    /// <inheritdoc cref="AutoSwitchEngine.ExitOnEmptyKey"/>
+    public bool AutoSwitchExitOnEmptyKey
+    {
+        get => _push.AutoSwitch.ExitOnEmptyKey;
+        set => _push.AutoSwitch.ExitOnEmptyKey = value;
+    }
+
     /// <inheritdoc cref="AutoSwitchEngine.MatchedAppLayerRule"/>
     public AppLayerRule? MatchedAppLayerRule => _push.AutoSwitch.MatchedAppLayerRule;
 
@@ -501,6 +515,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             activeWindowMonitor,
             mouseIdleMonitor);
         _push.KeyPositionForUi += OnKeyPositionForHighlight;
+        // Transparent-key exit predicate reads the currently-loaded config at
+        // call time, so swapping layouts or profiles needs no re-binding.
+        _push.SetTransparencyPredicate(ClassifyBindingOnLayer);
         _push.AutoSwitch.PropertyChanged += (_, e) =>
         {
             var relay = e.PropertyName switch
@@ -510,6 +527,8 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
                 nameof(AutoSwitchEngine.ActiveWindow) => nameof(ActiveWindow),
                 nameof(AutoSwitchEngine.MatchedAppLayerRule) => nameof(MatchedAppLayerRule),
                 nameof(AutoSwitchEngine.ExitTapKey) => nameof(ExitTapKey),
+                nameof(AutoSwitchEngine.ExitOnTransparentKey) => nameof(AutoSwitchExitOnTransparentKey),
+                nameof(AutoSwitchEngine.ExitOnEmptyKey) => nameof(AutoSwitchExitOnEmptyKey),
                 _ => null,
             };
             if (relay is not null) OnPropertyChanged(relay);
@@ -887,6 +906,30 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     /// <summary>Routes a layer push through the HID pipeline. Test-tab plumbing for SettingsViewModel.</summary>
     public void PushLayerToKeyboard(int index) => _hid.PushLayer(index);
+
+    /// <summary>
+    /// Classifies the currently-loaded config's binding at
+    /// (<paramref name="layer"/>, <paramref name="key"/>) as
+    /// <see cref="TransparentBindingKind.Transparent"/> for <c>&amp;trans</c>,
+    /// <see cref="TransparentBindingKind.Empty"/> for <c>&amp;none</c>, or
+    /// null for anything else (including when no config is loaded or indices
+    /// are out of range). No fall-through walk — exit fires on the visible
+    /// binding only.
+    /// </summary>
+    private TransparentBindingKind? ClassifyBindingOnLayer(int layer, int key)
+    {
+        var cfg = _config;
+        if (cfg is null) return null;
+        if (layer < 0 || layer >= cfg.Layers.Count) return null;
+        var bindings = cfg.Layers[layer].Bindings;
+        if (key < 0 || key >= bindings.Count) return null;
+        return bindings[key].Behavior switch
+        {
+            "&trans" => TransparentBindingKind.Transparent,
+            "&none" => TransparentBindingKind.Empty,
+            _ => null,
+        };
+    }
 
     /// <summary>
     /// Sends a 0xFD GetDeviceInfo request and awaits the 0xFE reply.

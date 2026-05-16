@@ -135,6 +135,39 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         }
     }
 
+    /// <summary>
+    /// Per-keyboard opt-in: a keypress on a literal <c>&amp;trans</c> binding
+    /// of the active layer exits an in-flight managed-app push (to the
+    /// configured fallback). Independent of <see cref="IsAutoSwitchExitOnEmptyKey"/>
+    /// and of the double-tap exit-key — any enabled gesture triggers the exit.
+    /// </summary>
+    public bool IsAutoSwitchExitOnTransparentKey
+    {
+        get => _mainViewModel.AutoSwitchExitOnTransparentKey;
+        set
+        {
+            if (_mainViewModel.AutoSwitchExitOnTransparentKey == value) return;
+            _mainViewModel.AutoSwitchExitOnTransparentKey = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// Per-keyboard opt-in: a keypress on a literal <c>&amp;none</c> binding
+    /// of the active layer exits an in-flight managed-app push. See
+    /// <see cref="IsAutoSwitchExitOnTransparentKey"/> for sibling semantics.
+    /// </summary>
+    public bool IsAutoSwitchExitOnEmptyKey
+    {
+        get => _mainViewModel.AutoSwitchExitOnEmptyKey;
+        set
+        {
+            if (_mainViewModel.AutoSwitchExitOnEmptyKey == value) return;
+            _mainViewModel.AutoSwitchExitOnEmptyKey = value;
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>Human-readable summary of the active keyboard's exit-tap
     /// key (e.g. "#42") or a localized "(none)" when unset. Drives the
     /// label next to the "Pick…" button.</summary>
@@ -456,6 +489,8 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             s.OnPropertyChanged(nameof(ExitTapKey));
             s.OnPropertyChanged(nameof(ExitTapSummary));
             s.OnPropertyChanged(nameof(HasExitTap));
+            s.OnPropertyChanged(nameof(IsAutoSwitchExitOnTransparentKey));
+            s.OnPropertyChanged(nameof(IsAutoSwitchExitOnEmptyKey));
             s.ReloadMouseLayerSnapshot();
         },
         [nameof(MainWindowViewModel.LayerSourceHint)] = s => s.OnPropertyChanged(nameof(LayerSourceStatus)),
@@ -468,6 +503,10 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             s.OnPropertyChanged(nameof(IsFallbackPrevious));
             s.OnPropertyChanged(nameof(IsFallbackBase));
         },
+        [nameof(MainWindowViewModel.AutoSwitchExitOnTransparentKey)] = s =>
+            s.OnPropertyChanged(nameof(IsAutoSwitchExitOnTransparentKey)),
+        [nameof(MainWindowViewModel.AutoSwitchExitOnEmptyKey)] = s =>
+            s.OnPropertyChanged(nameof(IsAutoSwitchExitOnEmptyKey)),
         [nameof(MainWindowViewModel.ExitTapKey)] = s =>
         {
             s.OnPropertyChanged(nameof(ExitTapKey));
@@ -535,6 +574,10 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         OnPropertyChanged(nameof(IsMouseLayerEnabled));
         OnPropertyChanged(nameof(SelectedMouseLayer));
         OnPropertyChanged(nameof(MouseLayerIdleTimeoutMs));
+        OnPropertyChanged(nameof(IsMouseLayerEndlessTimeout));
+        OnPropertyChanged(nameof(IsMouseLayerIdleTimeoutEnabled));
+        OnPropertyChanged(nameof(IsMouseLayerExitOnTransparentKey));
+        OnPropertyChanged(nameof(IsMouseLayerExitOnEmptyKey));
     }
 
     private void UpdateMouseLayerSnapshot(MouseLayerSettings next)
@@ -583,6 +626,95 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
             var clamped = Math.Clamp(value, 200, 2000);
             if (_mouseLayerSnapshot.IdleTimeoutMs == clamped) return;
             UpdateMouseLayerSnapshot(_mouseLayerSnapshot with { IdleTimeoutMs = clamped });
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// When true, mouse-layer push has no idle-driven revert: the push stays
+    /// in flight until an external exit gesture (transparent / empty-key tap,
+    /// profile switch, shutdown) tears it down. Disables the idle-timeout
+    /// slider in the UI but doesn't otherwise modify
+    /// <see cref="MouseLayerIdleTimeoutMs"/> so the value is preserved if the
+    /// user toggles back.
+    ///
+    /// <para>Endless mode requires at least one of
+    /// <see cref="IsMouseLayerExitOnTransparentKey"/> /
+    /// <see cref="IsMouseLayerExitOnEmptyKey"/> to be enabled (otherwise the
+    /// push could never be released). Turning endless on with neither set
+    /// auto-enables transparent-key exit; the per-flag setters refuse to
+    /// disable the last enabled flag while endless is on.</para>
+    /// </summary>
+    public bool IsMouseLayerEndlessTimeout
+    {
+        get => _mouseLayerSnapshot.EndlessTimeout;
+        set
+        {
+            if (_mouseLayerSnapshot.EndlessTimeout == value) return;
+            var next = _mouseLayerSnapshot with { EndlessTimeout = value };
+            bool autoEnabledTrans = false;
+            if (value && !next.ExitOnTransparentKey && !next.ExitOnEmptyKey)
+            {
+                next = next with { ExitOnTransparentKey = true };
+                autoEnabledTrans = true;
+            }
+            UpdateMouseLayerSnapshot(next);
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsMouseLayerIdleTimeoutEnabled));
+            if (autoEnabledTrans) OnPropertyChanged(nameof(IsMouseLayerExitOnTransparentKey));
+        }
+    }
+
+    /// <summary>Inverse of <see cref="IsMouseLayerEndlessTimeout"/>, for XAML
+    /// IsEnabled bindings on the idle-timeout slider/textbox.</summary>
+    public bool IsMouseLayerIdleTimeoutEnabled => !_mouseLayerSnapshot.EndlessTimeout;
+
+    /// <summary>
+    /// When true, a keypress on a literal <c>&amp;trans</c> binding of the
+    /// active layer reverts the mouse-layer push immediately (early exit
+    /// before idle). Independent of <see cref="IsMouseLayerExitOnEmptyKey"/>
+    /// and <see cref="IsMouseLayerEndlessTimeout"/>; works with any timeout.
+    /// Cannot be unset while endless is on if it's the last enabled flag.
+    /// </summary>
+    public bool IsMouseLayerExitOnTransparentKey
+    {
+        get => _mouseLayerSnapshot.ExitOnTransparentKey;
+        set
+        {
+            if (_mouseLayerSnapshot.ExitOnTransparentKey == value) return;
+            if (!value
+                && _mouseLayerSnapshot.EndlessTimeout
+                && !_mouseLayerSnapshot.ExitOnEmptyKey)
+            {
+                // Endless requires ≥1 exit gesture; bounce the UI back.
+                OnPropertyChanged();
+                return;
+            }
+            UpdateMouseLayerSnapshot(_mouseLayerSnapshot with { ExitOnTransparentKey = value });
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>
+    /// When true, a keypress on a literal <c>&amp;none</c> binding of the
+    /// active layer reverts the mouse-layer push immediately. See
+    /// <see cref="IsMouseLayerExitOnTransparentKey"/> for sibling semantics
+    /// and the endless-mode "≥1 gesture required" rule.
+    /// </summary>
+    public bool IsMouseLayerExitOnEmptyKey
+    {
+        get => _mouseLayerSnapshot.ExitOnEmptyKey;
+        set
+        {
+            if (_mouseLayerSnapshot.ExitOnEmptyKey == value) return;
+            if (!value
+                && _mouseLayerSnapshot.EndlessTimeout
+                && !_mouseLayerSnapshot.ExitOnTransparentKey)
+            {
+                OnPropertyChanged();
+                return;
+            }
+            UpdateMouseLayerSnapshot(_mouseLayerSnapshot with { ExitOnEmptyKey = value });
             OnPropertyChanged();
         }
     }
