@@ -250,6 +250,12 @@ public sealed partial class AutoSwitchEngine : ObservableObject
     private int GetFallbackTargetLayer(int preRuleLayer) =>
         FallbackMode == AutoSwitchFallbackMode.Base ? 0 : preRuleLayer;
 
+    private int? ResolveMouseLayerIndex()
+    {
+        var s = _settingsService.Load();
+        return s.MouseLayer.TryGetValue(_profile.Id, out var ms) ? ms.MouseLayerIndex : null;
+    }
+
     /// <summary>
     /// Auto-switch state transition. Fires on every
     /// <see cref="MatchedAppLayerRule"/> change.
@@ -266,8 +272,14 @@ public sealed partial class AutoSwitchEngine : ObservableObject
                 return;
 
             case (AutoSwitchSession.Idle, not null):
+                // Snapshot the layer that was active when the matching app
+                // gained focus — but if the user opened the app *with* the
+                // mouse, MouseLayerEngine has just put us on the configured
+                // mouse layer, which is a nogo as a typing fallback. Treat
+                // that case as Base.
+                int captured = activeLayer == ResolveMouseLayerIndex() ? 0 : activeLayer;
                 _session = new AutoSwitchSession.InSession(
-                    PreRuleLayer: activeLayer,
+                    PreRuleLayer: captured,
                     LastFiredRule: match,
                     LastPushedLayer: match.LayerIndex,
                     UserExited: false);
