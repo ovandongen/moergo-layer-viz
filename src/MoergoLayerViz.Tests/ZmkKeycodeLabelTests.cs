@@ -179,4 +179,110 @@ public class ZmkKeycodeLabelTests
         Assert.Equal("A", label);
         Assert.Equal("⇪", sub);
     }
+
+    /// <summary>
+    /// CurrentModifierStyle is static — tests that mutate it must restore it
+    /// or sibling tests asserting against the Mac default will fail under
+    /// unpredictable runner order.
+    /// </summary>
+    private sealed class ScopedModifierStyle : IDisposable
+    {
+        private readonly ModifierStyle _previous;
+        public ScopedModifierStyle(ModifierStyle s)
+        {
+            _previous = ZmkKeycodeLabel.CurrentModifierStyle;
+            ZmkKeycodeLabel.CurrentModifierStyle = s;
+        }
+        public void Dispose() => ZmkKeycodeLabel.CurrentModifierStyle = _previous;
+    }
+
+    [Theory]
+    [InlineData("LSHFT", "⇧")]
+    [InlineData("RSHFT", "⇧")]
+    [InlineData("LCTRL", "Ctrl")]
+    [InlineData("RCTRL", "Ctrl")]
+    [InlineData("LALT", "Alt")]
+    [InlineData("RALT", "Alt")]
+    [InlineData("LGUI", "⊞")]
+    [InlineData("RGUI", "⊞")]
+    [InlineData("LEFT_COMMAND", "⊞")]
+    [InlineData("LWIN", "⊞")]
+    public void Display_WindowsStyle_UsesWindowsGlyphs(string input, string expected)
+    {
+        using var _ = new ScopedModifierStyle(ModifierStyle.Windows);
+        Assert.Equal(expected, ZmkKeycodeLabel.Display(input));
+    }
+
+    [Theory]
+    [InlineData("LSHFT", "⇧")]
+    [InlineData("LCTRL", "Ctrl")]
+    [InlineData("LALT", "Alt")]
+    [InlineData("LGUI", "⊞")]
+    public void ModifierSubscript_WindowsStyle_UsesWindowsGlyphs(string input, string expected)
+    {
+        using var _ = new ScopedModifierStyle(ModifierStyle.Windows);
+        Assert.Equal(expected, ZmkKeycodeLabel.ModifierSubscript(input));
+    }
+
+    [Theory]
+    [InlineData("LS", "⇧")]
+    [InlineData("RS", "⇧")]
+    [InlineData("LC", "Ctrl")]
+    [InlineData("LA", "Alt")]
+    [InlineData("LG", "⊞")]
+    [InlineData("RG", "⊞")]
+    public void ShortModifierGlyph_WindowsStyle(string input, string expected)
+    {
+        using var _ = new ScopedModifierStyle(ModifierStyle.Windows);
+        Assert.Equal(expected, ZmkKeycodeLabel.ShortModifierGlyph(input));
+    }
+
+    [Theory]
+    [InlineData("LS", "⇪")]
+    [InlineData("LC", "⌃")]
+    [InlineData("LA", "⌥")]
+    [InlineData("LG", "⌘")]
+    public void ShortModifierGlyph_MacStyle(string input, string expected)
+    {
+        using var _ = new ScopedModifierStyle(ModifierStyle.Mac);
+        Assert.Equal(expected, ZmkKeycodeLabel.ShortModifierGlyph(input));
+    }
+
+    [Fact]
+    public void FormatKpParams_WindowsStyle_CtrlComboRendersAsCtrlSubscript()
+    {
+        using var _ = new ScopedModifierStyle(ModifierStyle.Windows);
+        var (label, sub) = ZmkKeycodeLabel.FormatKpParams(new[] { "LC", "V" });
+        Assert.Equal("V", label);
+        Assert.Equal("Ctrl", sub);
+    }
+
+    [Fact]
+    public void FormatKpParams_WindowsStyle_GuiComboRendersAsWinSubscript()
+    {
+        using var _ = new ScopedModifierStyle(ModifierStyle.Windows);
+        var (label, sub) = ZmkKeycodeLabel.FormatKpParams(new[] { "LG", "L" });
+        Assert.Equal("L", label);
+        Assert.Equal("⊞", sub);
+    }
+
+    [Fact]
+    public void FormatKpParams_WindowsStyle_ShiftedSymbolStillCollapses()
+    {
+        // The "single shift over a shiftable key" branch is style-independent —
+        // LS(LBKT) renders the literal '{' on both Mac and Windows.
+        using var _ = new ScopedModifierStyle(ModifierStyle.Windows);
+        var (label, sub) = ZmkKeycodeLabel.FormatKpParams(new[] { "LS", "LBKT" });
+        Assert.Equal("{", label);
+        Assert.Equal("", sub);
+    }
+
+    [Fact]
+    public void FormatKpParams_WindowsStyle_ChainedModifiers()
+    {
+        using var _ = new ScopedModifierStyle(ModifierStyle.Windows);
+        var (label, sub) = ZmkKeycodeLabel.FormatKpParams(new[] { "LC", "LS", "T" });
+        Assert.Equal("T", label);
+        Assert.Equal("Ctrl⇧", sub);
+    }
 }

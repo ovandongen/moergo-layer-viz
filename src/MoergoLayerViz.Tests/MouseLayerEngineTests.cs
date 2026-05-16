@@ -255,6 +255,28 @@ public class MouseLayerEngineTests
     }
 
     [Fact]
+    public void MoveStop_AfterApplySettingsClearedPush_DoesNotPushFallbackZero()
+    {
+        // Regression: ApplySettings mid-push calls RevertIfPushed, which clears
+        // _preMoveLayer. If the monitor is still active and a stale FireMoveStopped
+        // arrives, the engine used to fall back to layer 0 and silently jump the
+        // keyboard to base. The Start path is the only thing that should arm Stop.
+        var monitor = new FakeMouseIdleMonitor();
+        var engine = NewEngine(
+            new MouseLayerSettings(Enabled: true, MouseLayerIndex: 4),
+            monitor, () => 2, () => true, out var pushes, out _);
+
+        monitor.FireMoveStarted();  // captures pre-move = 2, pushes 4
+        engine.ApplySettings(new MouseLayerSettings(Enabled: true, MouseLayerIndex: 4, IdleTimeoutMs: 800));
+        // Revert from settings change pushed 2 back; engine state is now idle.
+        var pushesBeforeStaleStop = pushes.Count;
+
+        monitor.FireMoveStopped();  // stale event — must not push anything
+
+        Assert.Equal(pushesBeforeStaleStop, pushes.Count);
+    }
+
+    [Fact]
     public void SetActiveProfile_ReloadsSettingsForNewProfile()
     {
         var monitor = new FakeMouseIdleMonitor();

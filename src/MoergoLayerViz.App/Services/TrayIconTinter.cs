@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
+using MoergoLayerViz.Core.Colors;
 
 namespace MoergoLayerViz.App.Services;
 
@@ -24,7 +24,7 @@ internal sealed class TrayIconTinter
 {
     private readonly Bitmap _source;
     private readonly WindowIcon _original;
-    private readonly Dictionary<uint, WindowIcon> _cache = new();
+    private readonly Dictionary<(byte r, byte g, byte b), WindowIcon> _cache = new();
 
     public TrayIconTinter()
     {
@@ -43,23 +43,20 @@ internal sealed class TrayIconTinter
     /// </summary>
     public WindowIcon GetTinted(string hexRgb)
     {
-        if (!TryParseHexRgb(hexRgb, out var packed))
+        if (!HexRgb.TryParse(hexRgb, out var r, out var g, out var b))
             return _original;
-        if (_cache.TryGetValue(packed, out var cached))
+        var key = (r, g, b);
+        if (_cache.TryGetValue(key, out var cached))
             return cached;
 
-        var icon = new WindowIcon(Render(packed));
-        _cache[packed] = icon;
+        var icon = new WindowIcon(Render(r, g, b));
+        _cache[key] = icon;
         return icon;
     }
 
-    private RenderTargetBitmap Render(uint targetRgb)
+    private RenderTargetBitmap Render(byte r, byte g, byte b)
     {
-        var color = Color.FromArgb(
-            0xFF,
-            (byte)((targetRgb >> 16) & 0xFF),
-            (byte)((targetRgb >> 8) & 0xFF),
-            (byte)(targetRgb & 0xFF));
+        var color = Color.FromArgb(0xFF, r, g, b);
 
         var rtb = new RenderTargetBitmap(_source.PixelSize, _source.Dpi);
         var rect = new Rect(0, 0, _source.Size.Width, _source.Size.Height);
@@ -71,15 +68,5 @@ internal sealed class TrayIconTinter
             ctx.DrawRectangle(new SolidColorBrush(color), null, rect);
         }
         return rtb;
-    }
-
-    private static bool TryParseHexRgb(string? hex, out uint packed)
-    {
-        packed = 0;
-        if (string.IsNullOrWhiteSpace(hex)) return false;
-        var s = hex.AsSpan().TrimStart('#');
-        if (s.Length == 8) s = s[..6];
-        if (s.Length != 6) return false;
-        return uint.TryParse(s, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out packed);
     }
 }

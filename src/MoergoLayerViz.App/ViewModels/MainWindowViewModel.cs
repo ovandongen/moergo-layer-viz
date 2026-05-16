@@ -161,21 +161,10 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     {
         get
         {
-            if (TryParseRgb(PressHighlightColor, out var r, out var g, out var b))
+            if (MoergoLayerViz.Core.Colors.HexRgb.TryParse(PressHighlightColor, out var r, out var g, out var b))
                 return $"#{(int)(r * 0.55):X2}{(int)(g * 0.55):X2}{(int)(b * 0.55):X2}";
             return AppTheme.PressHighlightStrokeFallbackHex;
         }
-    }
-
-    private static bool TryParseRgb(string hex, out int r, out int g, out int b)
-    {
-        r = g = b = 0;
-        if (string.IsNullOrEmpty(hex)) return false;
-        var s = hex.StartsWith('#') ? hex[1..] : hex;
-        if (s.Length < 6) return false;
-        return int.TryParse(s.AsSpan(0, 2), System.Globalization.NumberStyles.HexNumber, null, out r)
-            && int.TryParse(s.AsSpan(2, 2), System.Globalization.NumberStyles.HexNumber, null, out g)
-            && int.TryParse(s.AsSpan(4, 2), System.Globalization.NumberStyles.HexNumber, null, out b);
     }
 
     partial void OnPressHighlightColorChanged(string value) =>
@@ -531,15 +520,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             activeWindowMonitor,
             () => _mouseLayer?.PreMoveLayer ?? ActiveLayerIndex,
             _profile);
-        // While the mouse layer is actively pushing, defer AutoSwitch's push:
-        // record the new target as the mouse engine's revert layer so the
-        // keyboard stays on the mouse layer until idle, then lands on the app
-        // rule's layer in one transition (no flicker, no orphaned mouse push).
-        _autoSwitch.PushLayerRequested += layer =>
-        {
-            if (_mouseLayer?.TryRedirectPendingPush(layer) == true) return;
-            PushLayerToKeyboard(layer);
-        };
+        _autoSwitch.PushLayerRequested += OnAutoSwitchPushRequested;
         _autoSwitch.PropertyChanged += (_, e) =>
         {
             var relay = e.PropertyName switch
@@ -1005,6 +986,19 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
             DiagnosticLog.Warn("HidQuery", $"config-id query failed: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// AutoSwitch ↔ MouseLayer coordination contract: while the mouse layer
+    /// is actively pushing, redirect the app rule's target into the mouse
+    /// engine's revert layer so the keyboard stays on the mouse layer until
+    /// idle, then lands on the app rule's layer in one transition (no
+    /// flicker, no orphaned mouse push).
+    /// </summary>
+    private void OnAutoSwitchPushRequested(int layer)
+    {
+        if (_mouseLayer?.TryRedirectPendingPush(layer) == true) return;
+        PushLayerToKeyboard(layer);
     }
 
     public void PushLayerToKeyboard(int index)

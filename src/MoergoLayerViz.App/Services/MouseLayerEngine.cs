@@ -204,7 +204,11 @@ public sealed class MouseLayerEngine
     private void OnMoveStopped()
     {
         if (!IsActive) return;
-        var target = _preMoveLayer ?? 0;
+        // Only OnMoveStarted arms the revert (by capturing _preMoveLayer). If
+        // we're idle here it means the push was already reverted out-of-band
+        // (settings change / profile switch) — firing layer 0 would jump the
+        // keyboard to base unexpectedly.
+        if (_preMoveLayer is not int target) return;
         DiagnosticLog.Info("MouseLayer", $"move stop → push layer {target}");
         PushLayerRequested?.Invoke(target);
         _preMoveLayer = null;
