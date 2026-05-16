@@ -85,6 +85,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     partial void OnIsHidSourceActiveChanged(bool value) => OnPropertyChanged(nameof(IsAppRulesTabVisible));
 
     [ObservableProperty] private bool _isAlwaysOnTop;
+    [ObservableProperty] private bool _colorTrayIconByActiveLayer;
     [ObservableProperty] private bool _isLiveHighlightingEnabled;
     [ObservableProperty] private bool _isAutoLayerSwitchEnabled;
     [ObservableProperty] private bool _hasLayoutLoaded;
@@ -126,6 +127,9 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
 
     partial void OnBackgroundOpacityChanged(double value) =>
         PersistSetting(s => s with { BackgroundOpacity = value });
+
+    partial void OnColorTrayIconByActiveLayerChanged(bool value) =>
+        PersistSetting(s => s with { ColorTrayIconByActiveLayer = value });
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PressHighlightStrokeColor))]
@@ -443,6 +447,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         _profile = KeyboardProfileRegistry.TryResolve(s.Keyboard, out var p) ? p : new Go60Profile();
         _selectedKeyboard = _profile;
         _isAlwaysOnTop = s.AlwaysOnTop;
+        _colorTrayIconByActiveLayer = s.ColorTrayIconByActiveLayer;
         _isLiveHighlightingEnabled = s.LiveKeyHighlighting;
         _isAutoLayerSwitchEnabled = s.AutoLayerSwitch;
         _backgroundOpacity = Math.Clamp(s.BackgroundOpacity, 0.0, 1.0);

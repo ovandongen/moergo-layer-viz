@@ -91,6 +91,8 @@
   <data name="Settings_BackgroundOpacityHint"><value>Hoe dicht de donkere vulling achter het toetsenbord is — zet op 0 voor een volledig transparante overlay.</value></data>
   <data name="Settings_PressHighlight"><value>Kleur indrukmarkering</value></data>
   <data name="Settings_PressHighlightHint"><value>Kleur van de stip die bij elke ingedrukte toets verschijnt.</value></data>
+  <data name="Settings_ColorTrayIcon"><value>Tray-icoon kleuren op actieve laag</value></data>
+  <data name="Settings_ColorTrayIconHint"><value>Kleur het systeemvak-icoon mee met de actieve laag, zodat je in één oogopslag de laag ziet wanneer het venster verborgen is. Zet uit als het detoneert met je menubalk.</value></data>
   <data name="Settings_GlobalHotkey"><value>Globale toon/verberg-sneltoets</value></data>
   <data name="Settings_GlobalHotkeyHint"><value>Druk overal op deze toets om de laagweergave te tonen of verbergen. De gekozen toets verschijnt niet in de laag-toetslijst hieronder.</value></data>
   <data name="Settings_Tab_General"><value>Algemeen</value></data>

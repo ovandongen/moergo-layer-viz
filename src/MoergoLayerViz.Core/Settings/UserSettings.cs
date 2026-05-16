@@ -41,6 +41,13 @@ public record UserSettings
     public bool AlwaysOnTop { get; init; } = true;
 
     /// <summary>
+    /// When true, the system tray icon is tinted to match the active layer's
+    /// color (from <see cref="LayerColors"/>, falling back to the default
+    /// palette). When false, the icon shows the original app artwork.
+    /// </summary>
+    public bool ColorTrayIconByActiveLayer { get; init; } = true;
+
+    /// <summary>
     /// Show/hide global hotkey, neutral key name ("F12", "F18"). Registered
     /// via the platform's native hotkey API (Carbon on macOS, User32 on
     /// Windows). Inert on Linux.

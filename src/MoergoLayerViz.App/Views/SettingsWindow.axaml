@@ -115,6 +115,16 @@
 
                     <Border Height="1" Background="{StaticResource BgSurface0}" IsVisible="{Binding IsGlobalHotkeySupported}" />
 
+                    <!-- Tray icon active-layer tint -->
+                    <StackPanel Spacing="6">
+                        <CheckBox Content="{Binding [Settings_ColorTrayIcon], Source={StaticResource Loc}}"
+                                  IsChecked="{Binding MainViewModel.ColorTrayIconByActiveLayer, Mode=TwoWay}" />
+                        <TextBlock Text="{Binding [Settings_ColorTrayIconHint], Source={StaticResource Loc}}"
+                                   Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Border Height="1" Background="{StaticResource BgSurface0}" />
+
                     <!-- Layout: top-hand picker for stacked mode. Greyed out
                          until the user enables stacked layout via the toolbar. -->
                     <StackPanel Spacing="6">

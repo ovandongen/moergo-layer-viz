@@ -97,6 +97,8 @@
   <data name="Settings_BackgroundOpacityHint"><value>How solid the dark fill behind the keyboard is — drop to 0 for a fully transparent overlay.</value></data>
   <data name="Settings_PressHighlight"><value>Press highlight color</value></data>
   <data name="Settings_PressHighlightHint"><value>Color of the dot that pops on each pressed key.</value></data>
+  <data name="Settings_ColorTrayIcon"><value>Color tray icon by active layer</value></data>
+  <data name="Settings_ColorTrayIconHint"><value>Tint the system tray icon with the active layer's color so you can read the layer at a glance when the window is hidden. Turn off if it clashes with your menu bar.</value></data>
   <data name="Settings_GlobalHotkey"><value>Global show/hide hotkey</value></data>
   <data name="Settings_GlobalHotkeyHint"><value>Press this key from anywhere to toggle the layer overlay. Whichever key you pick is excluded from the layer-key list below.</value></data>
   <data name="Settings_Tab_General"><value>General</value></data>

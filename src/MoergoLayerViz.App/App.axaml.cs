@@ -152,8 +152,33 @@ public partial class App : Application
             if (trayIcons?.Count > 0)
             {
                 var trayIcon = trayIcons[0];
-                trayIcon.Icon = new WindowIcon(
-                    AssetLoader.Open(new Uri("avares://MoergoLayerViz.App/Assets/icon.png")));
+                var trayTinter = new TrayIconTinter();
+
+                void ApplyTrayIcon()
+                {
+                    var tinted = viewModel.ColorTrayIconByActiveLayer;
+                    var color = viewModel.ActiveLayerTintColor;
+                    DiagnosticLog.Info("TrayIcon", $"ApplyTrayIcon tinted={tinted} color={color} layer={viewModel.ActiveLayerIndex}");
+                    var icon = tinted
+                        ? trayTinter.GetTinted(color)
+                        : trayTinter.GetOriginal();
+                    trayIcon.Icon = icon;
+                    // Mirror onto the main window so the Windows taskbar entry
+                    // tracks too. macOS Dock ignores Window.Icon (bundle-bound).
+                    mainWindow.Icon = icon;
+                }
+
+                ApplyTrayIcon();
+                viewModel.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName is nameof(MainWindowViewModel.ActiveLayerTintColor)
+                        or nameof(MainWindowViewModel.ColorTrayIconByActiveLayer)
+                        or nameof(MainWindowViewModel.SelectedKeyboard))
+                    {
+                        Dispatcher.UIThread.Post(ApplyTrayIcon);
+                    }
+                };
+
                 LocalizeTrayMenu(trayIcon);
                 // Named delegate so we can detach on Exit. Without the -=, every
                 // runtime culture switch leaks the prior handler's tray-icon
