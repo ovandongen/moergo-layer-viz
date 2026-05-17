@@ -6,6 +6,37 @@ using MoergoLayerViz.Core.Settings;
 namespace MoergoLayerViz.App.Services;
 
 /// <summary>
+/// Owns the mouse-movement → keyboard layer push state machine. See
+/// <see cref="MouseLayerEngine"/> for the full contract; this interface
+/// captures the public surface so consumers can substitute an alternate
+/// impl (tests, mocks).
+/// </summary>
+public interface IMouseLayerEngine : IDisposable
+{
+    /// <summary>Raised when the engine wants a layer pushed via HID.</summary>
+    event Action<int>? PushLayerRequested;
+
+    /// <summary>Current per-profile settings as last applied / loaded.</summary>
+    MouseLayerSettings CurrentSettings { get; }
+
+    /// <summary>The layer captured at move-start, or null if no push is in flight.</summary>
+    int? PreMoveLayer { get; }
+
+    void ApplySettings(MouseLayerSettings settings);
+    void SetActiveProfile(IKeyboardProfile profile);
+    void OnHidConnectionChanged();
+
+    /// <summary>Marks the in-flight push as consumed without firing another revert.</summary>
+    void ClearPushedState();
+
+    /// <summary>External revert trigger; fires the captured pre-move layer if a push is in flight.</summary>
+    void RevertNow(string reason);
+
+    /// <summary>Redirect another engine's pending push into this engine's revert target.</summary>
+    bool TryRedirectPendingPush(int layer);
+}
+
+/// <summary>
 /// Owns the mouse-movement → keyboard layer push state machine. Subscribes
 /// to an <see cref="IMouseIdleMonitor"/>: on movement, captures the current
 /// (HID-reported) layer and pushes the configured "mouse layer" to the
@@ -29,7 +60,7 @@ namespace MoergoLayerViz.App.Services;
 /// when capturing its own PreRuleLayer so a mid-mouse-push focus change
 /// doesn't snapshot the mouse layer as the app rule's "previous".</para>
 /// </summary>
-public sealed class MouseLayerEngine
+public sealed class MouseLayerEngine : IMouseLayerEngine
 {
     private readonly ISettingsService _settingsService;
     private readonly IMouseIdleMonitor _monitor;

@@ -48,12 +48,12 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     private LayerBindingResolver? _bindingResolver;
 
     private readonly IHidPipeline _hid;
-    private readonly LayerPushCoordinator _push;
+    private readonly ILayerPushCoordinator _push;
 
     // Press-highlight pipeline: per-layer (mod-set + keycode) → KeyViewModel
     // lookup, held-modifier set, modifier-grace deferral, per-key pulse.
     // Built lazily once the Keys collection is populated.
-    private KeyHighlightTracker? _highlightTracker;
+    private IKeyHighlightTracker? _highlightTracker;
 
     // --- UI-bindable state ---
     /// <summary>
@@ -171,7 +171,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// Global show/hide hotkey key name (e.g. "F12"). Modifier handling
     /// lives in <see cref="UserSettings.HotkeyModifiers"/> and isn't
     /// user-editable today. Changing this raises <see cref="HotkeyKeyChanged"/>
-    /// so the live <see cref="Services.GlobalHotkeyService"/> rewires
+    /// so the live <see cref="Services.IGlobalHotkeyService"/> rewires
     /// without restart.
     /// </summary>
     [ObservableProperty]
@@ -990,7 +990,7 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
     /// so it captures the <see cref="Keys"/> collection after
     /// <see cref="BuildKeysFromProfile"/> has populated it.
     /// </summary>
-    private KeyHighlightTracker HighlightTracker =>
+    private IKeyHighlightTracker HighlightTracker =>
         _highlightTracker ??= new KeyHighlightTracker(Keys);
 
 

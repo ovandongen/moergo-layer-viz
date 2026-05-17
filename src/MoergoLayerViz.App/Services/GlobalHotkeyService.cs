@@ -10,7 +10,22 @@ namespace MoergoLayerViz.App.Services;
 /// Windows). These APIs require no Accessibility / Input-Monitoring
 /// permission on macOS.
 /// </summary>
-public class GlobalHotkeyService : IDisposable
+public interface IGlobalHotkeyService : IDisposable
+{
+    /// <summary>Fired on the Avalonia UI thread when the hotkey is pressed.</summary>
+    Action? HotkeyPressed { get; set; }
+
+    /// <summary>Sets the key/modifier to register. Call <see cref="Start"/> to register, or call after Start to live-rebind.</summary>
+    void UpdateHotkey(string keyName, string modifiersName);
+
+    /// <summary>Registers the configured hotkey. Idempotent.</summary>
+    void Start();
+
+    /// <summary>Releases the registration. Idempotent.</summary>
+    void Stop();
+}
+
+public sealed class GlobalHotkeyService : IGlobalHotkeyService
 {
     private readonly INativeHotkeyRegistry _registry;
     private int _token;
@@ -22,10 +37,8 @@ public class GlobalHotkeyService : IDisposable
         _registry = registry;
     }
 
-    /// <summary>Fired on the Avalonia UI thread when the hotkey is pressed.</summary>
     public Action? HotkeyPressed { get; set; }
 
-    /// <summary>Sets the key/modifier to register. Call <see cref="Start"/> to register, or call after Start to live-rebind.</summary>
     public void UpdateHotkey(string keyName, string modifiersName)
     {
         _keyName = keyName;
@@ -38,14 +51,12 @@ public class GlobalHotkeyService : IDisposable
         }
     }
 
-    /// <summary>Registers the configured hotkey. Idempotent.</summary>
     public void Start()
     {
         if (_token != 0) return;
         Register();
     }
 
-    /// <summary>Releases the registration. Idempotent.</summary>
     public void Stop()
     {
         if (_token == 0) return;

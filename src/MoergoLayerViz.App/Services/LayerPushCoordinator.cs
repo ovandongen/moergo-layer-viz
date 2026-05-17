@@ -9,6 +9,27 @@ namespace MoergoLayerViz.App.Services;
 
 /// <summary>
 /// Owns the two layer-push engines (<see cref="AutoSwitchEngine"/>,
+/// <see cref="MouseLayerEngine"/>) and the handoff between them. See
+/// <see cref="LayerPushCoordinator"/> for the full contract; this interface
+/// captures the public surface for consumers and tests.
+/// </summary>
+public interface ILayerPushCoordinator : IDisposable
+{
+    AutoSwitchEngine AutoSwitch { get; }
+    IMouseLayerEngine? MouseLayer { get; }
+
+    /// <summary>Re-raised key-position events for the host's press-highlight tracker.</summary>
+    event Action<int, bool>? KeyPositionForUi;
+
+    void SetTransparencyPredicate(Func<int, int, TransparentBindingKind?>? classifier);
+    void SetActiveProfile(IKeyboardProfile profile);
+    void OnHidConnectionChanged();
+    void RevertMouseLayerForShutdown(TimeSpan timeout);
+    void Shutdown();
+}
+
+/// <summary>
+/// Owns the two layer-push engines (<see cref="AutoSwitchEngine"/>,
 /// <see cref="MouseLayerEngine"/>) and the handoff between them. Pushes from
 /// either engine route through this class to a single <see cref="IHidPipeline"/>,
 /// last-write-wins, except that AutoSwitch pushes are redirected into the
@@ -20,14 +41,14 @@ namespace MoergoLayerViz.App.Services;
 /// push" via its callback so its captured PreRuleLayer never observes the
 /// transient mouse layer.</para>
 /// </summary>
-public sealed class LayerPushCoordinator : IDisposable
+public sealed class LayerPushCoordinator : ILayerPushCoordinator
 {
     private readonly IHidPipeline _hid;
     private Func<int, int, TransparentBindingKind?> _classifyBinding;
     private bool _disposed;
 
     public AutoSwitchEngine AutoSwitch { get; }
-    public MouseLayerEngine? MouseLayer { get; }
+    public IMouseLayerEngine? MouseLayer { get; }
 
     /// <summary>Re-raised key-position events for the host's press-highlight tracker.</summary>
     public event Action<int, bool>? KeyPositionForUi;

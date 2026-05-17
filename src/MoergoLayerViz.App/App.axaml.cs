@@ -7,23 +7,22 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Platform;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using MoergoLayerViz.App.Localization;
 using MoergoLayerViz.App.Services;
 using MoergoLayerViz.App.Services.Hotkeys;
-using MoergoLayerViz.App.Services.MouseIdle;
 using MoergoLayerViz.App.ViewModels;
 using MoergoLayerViz.App.Views;
 using MoergoLayerViz.Core.Diagnostics;
 using MoergoLayerViz.Core.Settings;
 using Projektanker.Icons.Avalonia;
 using Projektanker.Icons.Avalonia.FontAwesome;
-using ZmkHidProtocol.ActiveWindow;
 
 namespace MoergoLayerViz.App;
 
 public partial class App : Application
 {
-    private GlobalHotkeyService? _hotkeyService;
+    private IGlobalHotkeyService? _hotkeyService;
 
     public override void Initialize()
     {
@@ -51,7 +50,14 @@ public partial class App : Application
                 e.Handled = true;
             };
 
-            var settingsService = new SettingsService();
+            // Composition root. AppServices owns construction of every
+            // service that the container can manage; per-service Exit
+            // disposal handlers are gone — the provider disposes its
+            // IDisposable singletons on the single Exit hook below.
+            var services = AppServices.BuildProvider();
+            desktop.Exit += (_, _) => services.Dispose();
+
+            var settingsService = services.GetRequiredService<ISettingsService>();
             var initialSettings = settingsService.Load();
             Loc.Instance.SetCulture(initialSettings.Language);
 
@@ -61,33 +67,8 @@ public partial class App : Application
             else if (Enum.TryParse<LogLevel>(initialSettings.LogLevel, true, out var logLevel))
                 DiagnosticLog.SetMinimumLevel(logLevel);
 
-            // Native global-hotkey registry (Carbon on macOS, User32 on
-            // Windows, no-op on Linux).
-            var hotkeyRegistry = NativeHotkeyRegistryFactory.Create();
-            desktop.Exit += (_, _) => hotkeyRegistry.Dispose();
-
-            // Construct only — MainWindowViewModel calls Start/Stop on demand
-            // based on the master toggle and rule-list state. App owns disposal.
-            IActiveWindowMonitor? activeWindowMonitor = null;
-            try
-            {
-                activeWindowMonitor = ActiveWindowMonitorFactory.Create();
-                desktop.Exit += (_, _) => activeWindowMonitor.Dispose();
-            }
-            catch (Exception ex)
-            {
-                DiagnosticLog.Warn("Startup", $"ActiveWindowMonitor unavailable: {ex.Message}");
-            }
-
-            // Global mouse-idle monitor (NSEvent / CGEventGetLocation polling
-            // on macOS, WH_MOUSE_LL on Windows, no-op stub on Linux). The
-            // engine starts/stops it on demand based on the master toggle +
-            // HID-connected state. App owns disposal.
-            IMouseIdleMonitor mouseIdleMonitor = MouseIdleMonitorFactory.Create();
-            desktop.Exit += (_, _) => mouseIdleMonitor.Dispose();
-
             DiagnosticLog.Info("Startup", "Creating MainWindowViewModel...");
-            var viewModel = new MainWindowViewModel(settingsService, activeWindowMonitor, mouseIdleMonitor);
+            var viewModel = services.GetRequiredService<MainWindowViewModel>();
             var mainWindow = new MainWindow { DataContext = viewModel };
             desktop.MainWindow = mainWindow;
 
@@ -238,7 +219,7 @@ public partial class App : Application
                     existing.Activate();
                     return;
                 }
-                var settingsVm = new SettingsViewModel(settingsService, viewModel);
+                var settingsVm = services.GetRequiredService<SettingsViewModel>();
                 settingsWindow = new SettingsWindow
                 {
                     DataContext = settingsVm,
@@ -288,13 +269,12 @@ public partial class App : Application
             // Global show/hide hotkey. The registry's Linux stub returns
             // failure on TryRegister, so the service no-ops on Linux without
             // a special case here.
-            _hotkeyService = new GlobalHotkeyService(hotkeyRegistry);
+            _hotkeyService = services.GetRequiredService<IGlobalHotkeyService>();
             _hotkeyService.HotkeyPressed = () => viewModel.ToggleWindowRequested?.Invoke();
             _hotkeyService.UpdateHotkey(initialSettings.HotkeyKey, initialSettings.HotkeyModifiers);
             _hotkeyService.Start();
             viewModel.HotkeyKeyChanged += newKey =>
                 _hotkeyService.UpdateHotkey(newKey, viewModel.HotkeyModifiers);
-            desktop.Exit += (_, _) => _hotkeyService.Dispose();
 
             // Restore the last-loaded layout (or show a "pick a file" prompt).
             Dispatcher.UIThread.Post(() => viewModel.InitializeAsync(), DispatcherPriority.Background);

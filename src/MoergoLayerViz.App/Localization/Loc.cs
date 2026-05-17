@@ -5,11 +5,27 @@ using MoergoLayerViz.App.Resources;
 namespace MoergoLayerViz.App.Localization;
 
 /// <summary>
+/// Service contract for runtime-switchable localization. Consumers that
+/// don't need to be the AXAML `{StaticResource Loc}` source should depend
+/// on this interface and resolve from the container; the concrete
+/// <see cref="Loc"/> class keeps the static facade alive for compiled
+/// AXAML bindings.
+/// </summary>
+public interface ILocalization
+{
+    /// <summary>Looks up a localized string by resource key. Returns <c>[key]</c> if missing.</summary>
+    string this[string key] { get; }
+
+    /// <summary>Looks up a format string by key and applies <paramref name="args"/>.</summary>
+    string Format(string key, params object[] args);
+}
+
+/// <summary>
 /// Lightweight localization singleton for AXAML binding.
 /// Usage in AXAML: Text="{Binding [Key_Name], Source={StaticResource Loc}}"
 /// Supports runtime language switching via SetCulture().
 /// </summary>
-public class Loc : INotifyPropertyChanged
+public class Loc : INotifyPropertyChanged, ILocalization
 {
     /// <summary>Shared culture across all instances (AXAML resource creates its own instance).</summary>
     private static CultureInfo? _culture;

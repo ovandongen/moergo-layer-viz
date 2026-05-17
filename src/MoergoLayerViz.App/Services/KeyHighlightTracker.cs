@@ -3,11 +3,23 @@ using MoergoLayerViz.App.ViewModels;
 namespace MoergoLayerViz.App.Services;
 
 /// <summary>
+/// Pulses a key VM in response to a HID position event. Implementations may
+/// freely choose how the pulse is timed and rendered; consumers only call
+/// <see cref="PulseAt"/>.
+/// </summary>
+public interface IKeyHighlightTracker
+{
+    /// <summary>HID-thread entry — pulses the key at <paramref name="position"/>.
+    /// Implementations are responsible for marshaling onto the UI thread.</summary>
+    void PulseAt(int position);
+}
+
+/// <summary>
 /// Owns the per-key pulse animation triggered by HID position events.
 /// <see cref="PulseAt"/> is called from the HID thread; it posts to the UI
 /// thread internally.
 /// </summary>
-public sealed class KeyHighlightTracker
+public sealed class KeyHighlightTracker : IKeyHighlightTracker
 {
     private readonly IReadOnlyList<KeyViewModel> _keys;
     private readonly Dictionary<KeyViewModel, CancellationTokenSource> _pressCts = new();

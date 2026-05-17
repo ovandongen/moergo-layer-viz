@@ -43,6 +43,8 @@ class Program
                 }
                 catch
                 {
+                    // Earliest-startup settings read; can't recover and a crash
+                    // here would block launch, so fall back to auto-detect.
                     renderMode = "auto";
                     source = "default (settings read failed)";
                 }

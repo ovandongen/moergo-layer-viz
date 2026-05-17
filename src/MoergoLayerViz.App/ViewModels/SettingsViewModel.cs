@@ -38,16 +38,7 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         HotkeyKeyChoices = PlatformCapabilities.GetAvailableFKeys(mainViewModel.HotkeyKey);
         _mainViewModel.PropertyChanged += OnMainPropertyChanged;
         _mainViewModel.Layers.CollectionChanged += OnLayersCollectionChanged;
-        UpdateChecker.PropertyChanged += (_, e) =>
-        {
-            var relay = e.PropertyName switch
-            {
-                nameof(UpdateChecker.UpdateMessage) => nameof(UpdateMessage),
-                nameof(UpdateChecker.IsChecking) => nameof(IsCheckingForUpdates),
-                _ => null,
-            };
-            if (relay is not null) OnPropertyChanged(relay);
-        };
+        UpdateChecker.PropertyChanged += OnUpdateCheckerPropertyChanged;
         // Seed the edit buffer from the committed list. The engine reads
         // _mainViewModel.AppLayerRules; this VM reads/writes EditingRules.
         // CommitAppLayerRules() pushes the buffer back on window close.
@@ -414,6 +405,18 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         _mainViewModel.PropertyChanged -= OnMainPropertyChanged;
         _mainViewModel.Layers.CollectionChanged -= OnLayersCollectionChanged;
         EditingRules.CollectionChanged -= OnEditingRulesChanged;
+        UpdateChecker.PropertyChanged -= OnUpdateCheckerPropertyChanged;
+    }
+
+    private void OnUpdateCheckerPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        var relay = e.PropertyName switch
+        {
+            nameof(UpdateChecker.UpdateMessage) => nameof(UpdateMessage),
+            nameof(UpdateChecker.IsChecking) => nameof(IsCheckingForUpdates),
+            _ => null,
+        };
+        if (relay is not null) OnPropertyChanged(relay);
     }
 
     /// <summary>Formatted percentage label next to the opacity slider. Reads
@@ -520,6 +523,11 @@ public partial class SettingsViewModel : ObservableObject, IDisposable
         if (e.PropertyName is { } name && _mainPropagators.TryGetValue(name, out var propagate))
             propagate(this);
     }
+
+    /// <summary>Test-only handle on the propagator dispatch table. The
+    /// SettingsViewModelMainPropertyCoverageTests guard against silent
+    /// drift when new MainViewModel properties are added.</summary>
+    internal static IReadOnlyCollection<string> PropagatedMainPropertyNames => _mainPropagators.Keys;
 
     private void OnLayersCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {

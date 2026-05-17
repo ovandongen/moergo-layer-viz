@@ -1,12 +1,29 @@
 namespace MoergoLayerViz.App.ViewModels;
 
 /// <summary>
-/// Default layer tab colors — indexed, wraps after 10. Matches the Svalboard
-/// palette for visual consistency with the sister app. Per-keyboard, per-layer
-/// overrides set by the user via the Settings window are looked up first;
-/// missing entries fall through to the built-in palette.
+/// Service contract for per-keyboard, per-layer color overrides on top of
+/// the built-in palette. Consumers that need to mutate overrides
+/// (settings VM, persistence loaders) should depend on this interface
+/// instead of the static <see cref="LayerColorPalette"/> facade, which is
+/// kept only so XAML converters and read-only call sites can stay
+/// allocation-free.
 /// </summary>
-public static class LayerColorPalette
+public interface ILayerColorService
+{
+    string GetDefaultColor(int index);
+    string GetColor(string profileId, int index);
+    void SetOverrides(Dictionary<string, Dictionary<int, string>> overrides);
+    void SetOverride(string profileId, int index, string? hex);
+    Dictionary<string, Dictionary<int, string>> Snapshot();
+}
+
+/// <summary>
+/// Default <see cref="ILayerColorService"/> backing the static
+/// <see cref="LayerColorPalette"/> facade. Registered as the
+/// singleton in <c>AppServices</c> so test/DI consumers see the same
+/// state the static does.
+/// </summary>
+public sealed class LayerColorService : ILayerColorService
 {
     private static readonly string[] DefaultColors =
     [
@@ -22,17 +39,12 @@ public static class LayerColorPalette
         "#EBA0AC", // layer 9 — maroon
     ];
 
-    private static Dictionary<string, Dictionary<int, string>> _overrides = new();
+    private Dictionary<string, Dictionary<int, string>> _overrides = new();
 
-    /// <summary>Built-in palette color for a layer (no override lookup).</summary>
-    public static string GetDefaultColor(int index)
+    public string GetDefaultColor(int index)
         => DefaultColors[((index % DefaultColors.Length) + DefaultColors.Length) % DefaultColors.Length];
 
-    /// <summary>
-    /// Effective color for a layer on the given keyboard profile — user override wins,
-    /// otherwise falls back to <see cref="GetDefaultColor"/>.
-    /// </summary>
-    public static string GetColor(string profileId, int index)
+    public string GetColor(string profileId, int index)
     {
         if (_overrides.TryGetValue(profileId, out var perLayer)
             && perLayer.TryGetValue(index, out var hex)
@@ -43,11 +55,7 @@ public static class LayerColorPalette
         return GetDefaultColor(index);
     }
 
-    /// <summary>
-    /// Replaces the override map wholesale. Called once at startup from
-    /// <c>MainWindowViewModel</c> with the persisted nested dictionary.
-    /// </summary>
-    public static void SetOverrides(Dictionary<string, Dictionary<int, string>> overrides)
+    public void SetOverrides(Dictionary<string, Dictionary<int, string>> overrides)
     {
         var copy = new Dictionary<string, Dictionary<int, string>>();
         if (overrides is not null)
@@ -61,11 +69,7 @@ public static class LayerColorPalette
         _overrides = copy;
     }
 
-    /// <summary>
-    /// Sets or clears a single override. Pass <c>null</c> or empty hex to remove
-    /// the override and revert to the built-in palette for that layer.
-    /// </summary>
-    public static void SetOverride(string profileId, int index, string? hex)
+    public void SetOverride(string profileId, int index, string? hex)
     {
         if (string.IsNullOrWhiteSpace(hex))
         {
@@ -81,12 +85,55 @@ public static class LayerColorPalette
         existing[index] = hex!;
     }
 
-    /// <summary>Deep copy of the current overrides — used when serializing back to <c>UserSettings</c>.</summary>
-    public static Dictionary<string, Dictionary<int, string>> Snapshot()
+    public Dictionary<string, Dictionary<int, string>> Snapshot()
     {
         var copy = new Dictionary<string, Dictionary<int, string>>();
         foreach (var (k, v) in _overrides)
             copy[k] = new Dictionary<int, string>(v);
         return copy;
     }
+}
+
+/// <summary>
+/// Default layer tab colors — indexed, wraps after 10. Matches the Svalboard
+/// palette for visual consistency with the sister app. Per-keyboard, per-layer
+/// overrides set by the user via the Settings window are looked up first;
+/// missing entries fall through to the built-in palette.
+///
+/// <para>This static class is the historical entry point for XAML
+/// converters and view code; it now delegates to a single
+/// <see cref="LayerColorService"/> instance that DI consumers also
+/// resolve. New code with access to the container should prefer
+/// <see cref="ILayerColorService"/> directly.</para>
+/// </summary>
+public static class LayerColorPalette
+{
+    /// <summary>Single instance shared with DI. Mutations and reads land in the same state.</summary>
+    internal static readonly LayerColorService Service = new();
+
+    /// <summary>Built-in palette color for a layer (no override lookup).</summary>
+    public static string GetDefaultColor(int index) => Service.GetDefaultColor(index);
+
+    /// <summary>
+    /// Effective color for a layer on the given keyboard profile — user override wins,
+    /// otherwise falls back to <see cref="GetDefaultColor"/>.
+    /// </summary>
+    public static string GetColor(string profileId, int index) => Service.GetColor(profileId, index);
+
+    /// <summary>
+    /// Replaces the override map wholesale. Called once at startup from
+    /// <c>MainWindowViewModel</c> with the persisted nested dictionary.
+    /// </summary>
+    public static void SetOverrides(Dictionary<string, Dictionary<int, string>> overrides)
+        => Service.SetOverrides(overrides);
+
+    /// <summary>
+    /// Sets or clears a single override. Pass <c>null</c> or empty hex to remove
+    /// the override and revert to the built-in palette for that layer.
+    /// </summary>
+    public static void SetOverride(string profileId, int index, string? hex)
+        => Service.SetOverride(profileId, index, hex);
+
+    /// <summary>Deep copy of the current overrides — used when serializing back to <c>UserSettings</c>.</summary>
+    public static Dictionary<string, Dictionary<int, string>> Snapshot() => Service.Snapshot();
 }
