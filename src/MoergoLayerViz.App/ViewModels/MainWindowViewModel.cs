@@ -764,35 +764,17 @@ public partial class MainWindowViewModel : ObservableObject, IBoardSurface
         LeftKeys.Clear();
         RightKeys.Clear();
 
-        double lMinX = double.PositiveInfinity, lMinY = double.PositiveInfinity;
-        double lMaxX = double.NegativeInfinity, lMaxY = double.NegativeInfinity;
-        double rMinX = double.PositiveInfinity, rMinY = double.PositiveInfinity;
-        double rMaxX = double.NegativeInfinity, rMaxY = double.NegativeInfinity;
-
         foreach (var pos in _profile.Keys)
         {
             var vm = new KeyViewModel(pos);
             Keys.Add(vm);
-            if (pos.Hand == Hand.Left)
-            {
-                LeftKeys.Add(vm);
-                if (pos.X < lMinX) lMinX = pos.X;
-                if (pos.Y < lMinY) lMinY = pos.Y;
-                if (pos.X + pos.Width > lMaxX) lMaxX = pos.X + pos.Width;
-                if (pos.Y + pos.Height > lMaxY) lMaxY = pos.Y + pos.Height;
-            }
-            else
-            {
-                RightKeys.Add(vm);
-                if (pos.X < rMinX) rMinX = pos.X;
-                if (pos.Y < rMinY) rMinY = pos.Y;
-                if (pos.X + pos.Width > rMaxX) rMaxX = pos.X + pos.Width;
-                if (pos.Y + pos.Height > rMaxY) rMaxY = pos.Y + pos.Height;
-            }
+            (pos.Hand == Hand.Left ? LeftKeys : RightKeys).Add(vm);
         }
 
-        _leftBounds = LeftKeys.Count > 0 ? (lMinX, lMinY, lMaxX, lMaxY) : (0, 0, 0, 0);
-        _rightBounds = RightKeys.Count > 0 ? (rMinX, rMinY, rMaxX, rMaxY) : (0, 0, 0, 0);
+        // Rotated bounds matter for boards like Glove80 whose shared-pivot thumb
+        // cluster swings far outside the unrotated (X, Y, W, H) rect.
+        _leftBounds = _profile.Keys.Where(k => k.Hand == Hand.Left).RotatedBounds();
+        _rightBounds = _profile.Keys.Where(k => k.Hand == Hand.Right).RotatedBounds();
 
         // Layout-derived properties depend on the freshly-computed bounds.
         OnPropertyChanged(nameof(CanvasWidth));

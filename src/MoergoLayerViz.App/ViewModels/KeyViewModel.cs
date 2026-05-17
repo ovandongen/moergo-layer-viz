@@ -1,3 +1,4 @@
+using Avalonia;
 using CommunityToolkit.Mvvm.ComponentModel;
 using MoergoLayerViz.App.Services;
 using MoergoLayerViz.Core.Keymap;
@@ -15,6 +16,19 @@ namespace MoergoLayerViz.App.ViewModels;
 public partial class KeyViewModel : ObservableObject
 {
     public KeyPosition Position { get; }
+
+    /// <summary>
+    /// Rotation pivot in the form Avalonia's <c>RenderTransformOrigin</c> wants.
+    /// Defaults to the key centre (<c>0.5, 0.5</c> relative); when the profile
+    /// supplies an absolute canvas pivot (Glove80 thumbs share one well outside
+    /// any individual key), it's translated to the key-local absolute frame
+    /// — RenderTransformOrigin's absolute mode is measured from the key's own
+    /// top-left, not the parent canvas.
+    /// </summary>
+    public RelativePoint RotationOrigin =>
+        Position.RotationOriginX is double rx && Position.RotationOriginY is double ry
+            ? new RelativePoint(rx - Position.X, ry - Position.Y, RelativeUnit.Absolute)
+            : RelativePoint.Center;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LabelFontSize))]

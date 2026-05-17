@@ -15,4 +15,9 @@
     <ProjectReference Include="..\..\external\zmk-hid-protocol\src\ZmkHidProtocol\ZmkHidProtocol.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\go60.dtsi" />
+    <EmbeddedResource Include="Resources\glove80.dtsi" />
+  </ItemGroup>
+
 </Project>

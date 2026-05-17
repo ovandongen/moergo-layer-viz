@@ -19,12 +19,18 @@
                   Height="{Binding Position.Height}"
                   Background="Transparent"
                   PointerPressed="OnKeyPointerPressed"
+                  RenderTransformOrigin="{Binding RotationOrigin}"
                   ToolTip.Tip="{Binding Tooltip}">
                 <Grid.RenderTransform>
                     <RotateTransform Angle="{Binding Position.RotationDegrees}" />
                 </Grid.RenderTransform>
-                <Grid.RenderTransformOrigin>0.5,0.5</Grid.RenderTransformOrigin>
 
+                <!-- Inner Margin gives every key a uniform visual gap from
+                     its neighbours without disturbing the outer Grid's
+                     hit-test rectangle or its absolute-coord rotation
+                     pivot. Tune here to adjust all dtsi-rendered boards
+                     at once. -->
+                <Grid Margin="1">
                 <!-- Key fill: driven by KeyFillColor (precedence: decoration.background
                      > target-layer palette color > default KeyDefaultFill). -->
                 <Rectangle RadiusX="6" RadiusY="6"
@@ -111,6 +117,7 @@
                                Foreground="{Binding KeyForegroundColor, Converter={x:Static convApp:HexColorToBrushConverter.Instance}}"
                                IsVisible="{Binding Subscript, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" />
                 </StackPanel>
+                </Grid>
             </Grid>
         </DataTemplate>
     </UserControl.Resources>
