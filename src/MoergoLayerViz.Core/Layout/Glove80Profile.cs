@@ -2,13 +2,8 @@ namespace MoergoLayerViz.Core.Layout;
 
 /// <summary>
 /// Moergo Glove80: 80 keys, 6 columns per hand, two 3-key thumb clusters per
-/// hand. Geometry loaded from <c>Resources/glove80.dtsi</c>.
-/// <para>
-/// No remap quirk — the dtsi's keys[] is already in Moergo JSON / matrix-
-/// transform order (row-5/6 interleaved around the thumb clusters), so the
-/// binding-index → dtsi-position mapping is the identity. The custom thumb
+/// hand. Geometry loaded from <c>Resources/glove80.dtsi</c>. Custom thumb
 /// labels distinguish row A (52–57) from row B (69–74).
-/// </para>
 /// <para>
 /// All six left-thumb keys share rotation pivot (450, 925) centi-units; the
 /// six right-thumb keys share (1350, 925). Well below the lowest matrix row —
@@ -24,7 +19,6 @@ public sealed class Glove80Profile() : DtsiKeyboardProfile(
     productId: ZmkHidIds.ProductId,
     hidNameSubstring: "Glove80",
     dtsiResourceName: "MoergoLayerViz.Core.Resources.glove80.dtsi",
-    bindingToDtsi: null, // identity
     midlineCentiU: 850,
     // Half-key (30 px) horizontal margin around the centi-u extent 0..1700.
     // Vertical canvas has extra slack so the thumbs swinging down around their

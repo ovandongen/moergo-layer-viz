@@ -18,11 +18,10 @@ public sealed record DtsiKeyPhysical(
     int Ry);
 
 /// <summary>Parsed dtsi physical layout: the keys list in dtsi declaration order.
-/// This is the dtsi's visual reading order — it does <b>not</b> necessarily match
-/// Moergo's JSON <c>bindings[]</c> / firmware matrix-transform order. Glove80 happens
-/// to agree (identity); Go60 needs a 9-entry remap for the row-5 + thumb block. See
-/// <c>Go60Profile.BindingToDtsi</c> and the
-/// <c>moergo-json-vs-dtsi-order</c> memory.</summary>
+/// Both shipped boards' local dtsi files are arranged so this order matches
+/// Moergo's JSON <c>bindings[]</c> index. The upstream Go60 dtsi at
+/// <c>~/Desktop/Projects/Moergo/dtsi/go60.dtsi</c> disagrees for the row-5 +
+/// thumb block — a resync must re-apply our local reorder. See CLAUDE.md.</summary>
 public sealed class DtsiPhysicalLayout
 {
     public IReadOnlyList<DtsiKeyPhysical> Keys { get; }

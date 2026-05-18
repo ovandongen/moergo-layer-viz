@@ -4,11 +4,10 @@ using Xunit;
 namespace MoergoLayerViz.Tests;
 
 /// <summary>
-/// Pins the dtsi-driven Go60 geometry so future parser / remap / scale tweaks
-/// don't silently move keys. The values here are recorded from the canonical
-/// upstream Moergo <c>go60.dtsi</c> at 0.6 px/centi-u with a (30, 60) canvas
-/// inset — they're the source of truth, not a copy of the previous hand-tuned
-/// literals (which used a 0.64 multiplier).
+/// Pins the dtsi-driven Go60 geometry so future parser / scale tweaks don't
+/// silently move keys. The values here are recorded from the local
+/// <c>Resources/go60.dtsi</c> (row-5/thumb block reordered to match JSON
+/// binding order) at 0.6 px/centi-u with a (30, 60) canvas inset.
 /// </summary>
 public class Go60ProfileGeometryTests
 {
@@ -60,10 +59,10 @@ public class Go60ProfileGeometryTests
     }
 
     [Fact]
-    public void Binding51_IsRightRow5Index_RemappedToDtsi57()
+    public void Binding51_IsRightRow5Index()
     {
-        // The remap kicks in here: JSON binding 51 = right row 5 index, but the
-        // dtsi puts that at idx 57 (after the thumb clusters).
+        // JSON binding 51 = right row 5 index. Local Go60 dtsi is reordered so
+        // dtsi index 51 already points at that key (no remap).
         var k = _profile.Keys[51];
         Assert.Equal(Hand.Right, k.Hand);
         Assert.Equal(0, k.RotationDegrees);

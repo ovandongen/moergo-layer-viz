@@ -7,12 +7,6 @@ namespace MoergoLayerViz.Core.Layout;
 /// geometry comes from a ZMK <c>physical_layouts.dtsi</c> file. Pass the
 /// per-board metadata to the constructor; everything else (key construction,
 /// hand assignment, tooltip text, HID matching) is shared.
-/// <para>
-/// "Quirks" — like Go60's 9-entry <c>bindingToDtsi</c> remap, or Glove80's
-/// custom thumb labels — are still supported by passing the relevant ctor
-/// argument. A board with no quirks needs no subclass at all; just instantiate
-/// this class directly in <see cref="KeyboardProfileRegistry"/>.
-/// </para>
 /// </summary>
 public class DtsiKeyboardProfile : IKeyboardProfile
 {
@@ -36,7 +30,6 @@ public class DtsiKeyboardProfile : IKeyboardProfile
     /// <param name="productId">USB HID product id used for device matching.</param>
     /// <param name="hidNameSubstring">Case-insensitive product-name substring (e.g. "Go60", "Glove80").</param>
     /// <param name="dtsiResourceName">Embedded-resource name of the dtsi geometry file.</param>
-    /// <param name="bindingToDtsi">Optional binding-index → dtsi-keys[]-index remap. <c>null</c> = identity.</param>
     /// <param name="midlineCentiU">Centi-unit X that separates left-hand keys from right-hand keys.</param>
     /// <param name="canvasWidth">Visual canvas width in px.</param>
     /// <param name="canvasHeight">Visual canvas height in px.</param>
@@ -50,7 +43,6 @@ public class DtsiKeyboardProfile : IKeyboardProfile
         int productId,
         string hidNameSubstring,
         string dtsiResourceName,
-        int[]? bindingToDtsi,
         int midlineCentiU,
         double canvasWidth,
         double canvasHeight,
@@ -70,7 +62,6 @@ public class DtsiKeyboardProfile : IKeyboardProfile
         Keys = DtsiBackedLayoutBuilder.Build(
             resourceName: dtsiResourceName,
             keyCount: keyCount,
-            bindingToDtsi: bindingToDtsi,
             midlineCentiU: midlineCentiU,
             describeKey: DescribeKey);
     }

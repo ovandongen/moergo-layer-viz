@@ -14,12 +14,6 @@ internal static class DtsiBackedLayoutBuilder
     /// </summary>
     /// <param name="resourceName">Embedded resource name of the dtsi file (e.g. <c>"MoergoLayerViz.Core.Resources.go60.dtsi"</c>).</param>
     /// <param name="keyCount">Number of bindings the profile exposes. Drives the iteration and the list capacity.</param>
-    /// <param name="bindingToDtsi">
-    /// Optional binding-index → dtsi-keys[]-index remap. Pass <c>null</c> when
-    /// the profile uses identity mapping (Glove80). Go60 needs a 9-entry
-    /// remap because Moergo's JSON / matrix-transform ordering disagrees with
-    /// the dtsi's visual ordering for the row-5 + thumb-cluster block.
-    /// </param>
     /// <param name="midlineCentiU">X cutoff in centi-units that separates left-hand keys from right-hand keys.</param>
     /// <param name="describeKey">
     /// Per-profile tooltip describer. Receives binding index, the raw dtsi
@@ -31,7 +25,6 @@ internal static class DtsiBackedLayoutBuilder
     public static IReadOnlyList<KeyPosition> Build(
         string resourceName,
         int keyCount,
-        int[]? bindingToDtsi,
         int midlineCentiU,
         Func<int, DtsiKeyPhysical, Hand, string> describeKey,
         double pxPerCentiU = 0.6,
@@ -43,7 +36,7 @@ internal static class DtsiBackedLayoutBuilder
         var list = new List<KeyPosition>(keyCount);
         for (int binding = 0; binding < keyCount; binding++)
         {
-            var entry = dtsi[bindingToDtsi is null ? binding : bindingToDtsi[binding]];
+            var entry = dtsi[binding];
             var hand = entry.X < midlineCentiU ? Hand.Left : Hand.Right;
             double? rotOx = null, rotOy = null;
             if (entry.Rotation != 0)
